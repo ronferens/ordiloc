@@ -73,6 +73,8 @@ if __name__ == '__main__':
     arg_parser.add_argument('dataset_path', help='The path to the dataset .csv file', type=str)
     arg_parser.add_argument('scene', help='The name of the scene to cluster', type=str)
     arg_parser.add_argument('num_clusters', help='Number of clusters in the dataset', type=int)
+    arg_parser.add_argument('--viz', help='Indicates whether to visualize the positional clustering',
+                            action='store_true', default=False)
     args = arg_parser.parse_args()
 
     # Setting input scene and path
@@ -129,10 +131,11 @@ if __name__ == '__main__':
                                    name='{} Data'.format(data_type.title()),
                                    text=list(map(lambda fn: f'File: ' + fn, images_names))))
 
-    layout = go.Layout(title='Scene Data: <b>{}/{} - {} Segments</b>'.format(args.dataset_name.title(), scene,
-                                                                             args.num_clusters),
-                       xaxis=dict(title='X Coordinate'),
-                       yaxis=dict(title='Y Coordinate'))
+    if args.viz:
+        layout = go.Layout(title='Scene Data: <b>{}/{} - {} Segments</b>'.format(args.dataset_name.title(), scene,
+                                                                                 args.num_clusters),
+                           xaxis=dict(title='X Coordinate'),
+                           yaxis=dict(title='Y Coordinate'))
 
-    save_path = r'scene_train_data_plot_{}_{}.html'.format(args.dataset_name, scene)
-    plotly.offline.plot({'data': data, 'layout': layout}, filename=save_path, auto_open=True)
+        save_path = r'scene_train_data_plot_{}_{}.html'.format(args.dataset_name, scene)
+        plotly.offline.plot({'data': data, 'layout': layout}, filename=save_path, auto_open=True)
