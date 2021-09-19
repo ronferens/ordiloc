@@ -109,6 +109,7 @@ if __name__ == '__main__':
                 labels[cluster_type] = cluster_data_for_ordinal_classification(args.num_clusters, data_to_cluster)
 
                 if cluster_type == 'position':
+                    # Visualizing only for positional clusters (using X/Y coordinates)
                     for indx, label in enumerate(np.unique(labels[cluster_type])):
                         indices = label == labels[cluster_type]
                         data.append(go.Scatter(x=scene_data[data_type]['data']['t1'][indices].to_numpy(),
