@@ -1,0 +1,1 @@
+posenet train models/backbones/efficient-net-b0.pth /mnt/data/datasets/cambridge datasets/CambridgeLandmarks/abs_cambridge_pose_sorted.csv_ShopFacade_train.csv

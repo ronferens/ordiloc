@@ -1,0 +1,21 @@
+[16-09-21 17:52] [INFO] - Start posenet with train
+[16-09-21 17:52] [INFO] - Using dataset: /media/ronf/data/datasets/cambridge
+[16-09-21 17:52] [INFO] - Using labels file: datasets/CambridgeLandmarks/abs_cambridge_pose_sorted.csv_ShopFacade_train.csv
+[16-09-21 17:52] [INFO] - Running with configuration:
+	batch_size: 32
+	learnable: True
+	s_x: -3.0
+	s_q: -6.5
+	norm: 2
+	lr: 0.001
+	weight_decay: 0.0001
+	eps: 1e-10
+	lr_scheduler_step_size: 200
+	lr_scheduler_gamma: 0.5
+	n_epochs: 600
+	backbone_dim: 1280
+	latent_dim: 1024
+	n_freq_print: 5
+	n_freq_checkpoint: 10
+	n_workers: 4
+	device_id: cuda:0
