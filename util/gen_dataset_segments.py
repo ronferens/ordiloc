@@ -9,7 +9,7 @@ from plotly.offline import init_notebook_mode
 from sklearn.cluster import KMeans
 import argparse
 from itertools import permutations
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.decomposition import PCA
 
 init_notebook_mode(connected=False)
 
@@ -50,16 +50,37 @@ def get_labels_for_ordinal_classification_l2_norm(labels, centroids):
     return org_labels_order, new_labels_order
 
 
-def get_labels_for_ordinal_classification_lda(labels, centroids):
-    # Setting the initial labels order
-    indexes = np.unique(labels, return_index=True)[1]
-    org_labels_order = np.array([labels[index] for index in sorted(indexes)])
+def get_labels_for_ordinal_classification(num_of_segments, data):
+    # Performing PCA to project the data into 1D array
+    pca = PCA(n_components=2)
+    data_pca = pca.fit(data).transform(data)
 
-    lda = LinearDiscriminantAnalysis(n_components=1)
-    data_1d = lda.fit(centroids, org_labels_order.T).transform(centroids)
-    new_labels_order = None
+    # Clustering the 1D projected data and sorting by centroids
+    kmeans = KMeans(n_clusters=num_of_segments, random_state=0).fit(data_pca)
+    centroids = kmeans.cluster_centers_
 
-    return org_labels_order, new_labels_order
+    import matplotlib.pyplot as plt
+    plt.figure()
+    for i in range(num_of_segments):
+        indices = i == kmeans.labels_
+        plt.scatter(data_pca[indices, 0], data_pca[indices, 1], label='label {}'.format(i))
+        plt.scatter(centroids[i, 0], centroids[i, 1], label='centroid {}'.format(i))
+    plt.legend()
+    plt.grid()
+    plt.show()
+
+    pca_centroids = PCA(n_components=1)
+    centroids_pca = pca_centroids.fit(centroids).transform(centroids)
+    org_labels_order = np.argsort(centroids_pca.reshape(1, -1))[0]
+
+    # Assigning the new labels
+    new_labels_order = np.arange(num_of_segments)
+    new_labels = np.zeros_like(kmeans.labels_)
+    for new_l, l in enumerate(org_labels_order):
+        indices = l == kmeans.labels_
+        new_labels[indices] = new_labels_order[new_l]
+
+    return new_labels
 
 
 def cluster_data_for_ordinal_classification(num_of_segments, data):
@@ -69,7 +90,6 @@ def cluster_data_for_ordinal_classification(num_of_segments, data):
 
     # Find best labels setup for ordinal-classification
     org_labels_order, new_labels_order = get_labels_for_ordinal_classification_l2_norm(init_labels, centroids)
-    # org_labels_order, new_labels_order = get_labels_for_ordinal_classification_lda(init_labels, centroids)
 
     # Assigning the new labels
     new_labels = np.zeros_like(init_labels)
@@ -111,17 +131,18 @@ if __name__ == '__main__':
             data_to_cluster = scene_data['data'][['t1', 't2', 't3']].to_numpy()
         else:
             data_to_cluster = scene_data['data'][['q1', 'q2', 'q3', 'q4']].to_numpy()
-        labels = cluster_data_for_ordinal_classification(args.num_clusters, data_to_cluster)
-        print(labels)
+
+        # labels = cluster_data_for_ordinal_classification(args.num_clusters, data_to_cluster)
+        labels = get_labels_for_ordinal_classification(args.num_clusters, data_to_cluster)
 
         # Visualizing only for positional clusters (using X/Y coordinates)
-        for indx, label in enumerate(np.unique(labels)):
+        for label in np.unique(labels):
             indices = label == labels
             data.append(go.Scatter(x=scene_data['data']['t1'][indices].to_numpy(),
                                    y=scene_data['data']['t2'][indices].to_numpy(),
                                    mode='markers',
                                    marker=dict(line=dict(color='DarkSlateGrey', width=1)),
-                                   name='cluster #{}'.format(indx),
+                                   name='cluster #{}'.format(label),
                                    text=list(map(lambda fn: f'File: ' + fn, images_names))))
 
         scene_name_with_label = ['{}{}'.format(scene, i) for i in labels]
