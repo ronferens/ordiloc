@@ -29,27 +29,6 @@ def get_dataset_images_names(paths):
     return names
 
 
-def get_labels_for_ordinal_classification_l2_norm(labels, centroids):
-    # Setting the initial labels order
-    indexes = np.unique(labels, return_index=True)[1]
-    org_labels_order = np.arange(len(indexes))
-
-    # Listing all possible labels permutations
-    perms = set(permutations(org_labels_order))
-
-    # Finding the labels order that generate the largest distance between the centroids
-    new_labels_order = None
-    max_dist_perm = 0
-    for p in tqdm(perms, desc='Setting best labels for ordinal classification'):
-        distances = np.linalg.norm(centroids - centroids[p[0]], axis=1)
-        total_dist = np.sum(distances)
-        if total_dist > max_dist_perm:
-            max_dist_perm = total_dist
-            new_labels_order = distances.argsort()
-
-    return org_labels_order, new_labels_order
-
-
 def get_labels_for_ordinal_classification(num_of_segments, data):
     # Performing PCA to project the data into 1D array
     pca = PCA(n_components=2)
@@ -59,15 +38,17 @@ def get_labels_for_ordinal_classification(num_of_segments, data):
     kmeans = KMeans(n_clusters=num_of_segments, random_state=0).fit(data_pca)
     centroids = kmeans.cluster_centers_
 
-    import matplotlib.pyplot as plt
-    plt.figure()
-    for i in range(num_of_segments):
-        indices = i == kmeans.labels_
-        plt.scatter(data_pca[indices, 0], data_pca[indices, 1], label='label {}'.format(i))
-        plt.scatter(centroids[i, 0], centroids[i, 1], label='centroid {}'.format(i))
-    plt.legend()
-    plt.grid()
-    plt.show()
+    # Debug visualization of segmented clusters
+    # -----------------------------------------
+    # import matplotlib.pyplot as plt
+    # plt.figure()
+    # for i in range(num_of_segments):
+    #     indices = i == kmeans.labels_
+    #     plt.scatter(data_pca[indices, 0], data_pca[indices, 1], label='label {}'.format(i))
+    #     plt.scatter(centroids[i, 0], centroids[i, 1], label='centroid {}'.format(i))
+    # plt.legend()
+    # plt.grid()
+    # plt.show()
 
     pca_centroids = PCA(n_components=1)
     centroids_pca = pca_centroids.fit(centroids).transform(centroids)
@@ -79,23 +60,6 @@ def get_labels_for_ordinal_classification(num_of_segments, data):
     for new_l, l in enumerate(org_labels_order):
         indices = l == kmeans.labels_
         new_labels[indices] = new_labels_order[new_l]
-
-    return new_labels
-
-
-def cluster_data_for_ordinal_classification(num_of_segments, data):
-    kmeans = KMeans(n_clusters=num_of_segments, random_state=0).fit(data)
-    init_labels = kmeans.labels_
-    centroids = kmeans.cluster_centers_
-
-    # Find best labels setup for ordinal-classification
-    org_labels_order, new_labels_order = get_labels_for_ordinal_classification_l2_norm(init_labels, centroids)
-
-    # Assigning the new labels
-    new_labels = np.zeros_like(init_labels)
-    for idx, l in enumerate(org_labels_order):
-        indices = l == init_labels
-        new_labels[indices] = new_labels_order[idx]
 
     return new_labels
 
@@ -132,7 +96,6 @@ if __name__ == '__main__':
         else:
             data_to_cluster = scene_data['data'][['q1', 'q2', 'q3', 'q4']].to_numpy()
 
-        # labels = cluster_data_for_ordinal_classification(args.num_clusters, data_to_cluster)
         labels = get_labels_for_ordinal_classification(args.num_clusters, data_to_cluster)
 
         # Visualizing only for positional clusters (using X/Y coordinates)
