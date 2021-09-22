@@ -9,6 +9,7 @@ from plotly.offline import init_notebook_mode
 from sklearn.cluster import KMeans
 import argparse
 from itertools import permutations
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 init_notebook_mode(connected=False)
 
@@ -28,10 +29,10 @@ def get_dataset_images_names(paths):
     return names
 
 
-def get_labels_for_ordinal_classification(labels, centroids):
+def get_labels_for_ordinal_classification_l2_norm(labels, centroids):
     # Setting the initial labels order
     indexes = np.unique(labels, return_index=True)[1]
-    org_labels_order = [labels[index] for index in sorted(indexes)]
+    org_labels_order = np.arange(len(indexes))
 
     # Listing all possible labels permutations
     perms = set(permutations(org_labels_order))
@@ -39,13 +40,24 @@ def get_labels_for_ordinal_classification(labels, centroids):
     # Finding the labels order that generate the largest distance between the centroids
     new_labels_order = None
     max_dist_perm = 0
-    for p in perms:
-
+    for p in tqdm(perms, desc='Setting best labels for ordinal classification'):
         distances = np.linalg.norm(centroids - centroids[p[0]], axis=1)
         total_dist = np.sum(distances)
         if total_dist > max_dist_perm:
             max_dist_perm = total_dist
             new_labels_order = distances.argsort()
+
+    return org_labels_order, new_labels_order
+
+
+def get_labels_for_ordinal_classification_lda(labels, centroids):
+    # Setting the initial labels order
+    indexes = np.unique(labels, return_index=True)[1]
+    org_labels_order = np.array([labels[index] for index in sorted(indexes)])
+
+    lda = LinearDiscriminantAnalysis(n_components=1)
+    data_1d = lda.fit(centroids, org_labels_order.T).transform(centroids)
+    new_labels_order = None
 
     return org_labels_order, new_labels_order
 
@@ -56,11 +68,12 @@ def cluster_data_for_ordinal_classification(num_of_segments, data):
     centroids = kmeans.cluster_centers_
 
     # Find best labels setup for ordinal-classification
-    org_labels_order, new_labels_order = get_labels_for_ordinal_classification(init_labels, centroids)
+    org_labels_order, new_labels_order = get_labels_for_ordinal_classification_l2_norm(init_labels, centroids)
+    # org_labels_order, new_labels_order = get_labels_for_ordinal_classification_lda(init_labels, centroids)
 
     # Assigning the new labels
     new_labels = np.zeros_like(init_labels)
-    for idx, l in tqdm(enumerate(org_labels_order), desc='Setting best labels for ordinal classification'):
+    for idx, l in enumerate(org_labels_order):
         indices = l == init_labels
         new_labels[indices] = new_labels_order[idx]
 
@@ -85,7 +98,6 @@ if __name__ == '__main__':
 
     for cluster_type in ['position', 'orientation']:
         data = []
-        labels = {}
 
         # Reading the train/test data
         scene_data['data'] = pd.read_csv(input_file)
@@ -99,11 +111,12 @@ if __name__ == '__main__':
             data_to_cluster = scene_data['data'][['t1', 't2', 't3']].to_numpy()
         else:
             data_to_cluster = scene_data['data'][['q1', 'q2', 'q3', 'q4']].to_numpy()
-        labels[cluster_type] = cluster_data_for_ordinal_classification(args.num_clusters, data_to_cluster)
+        labels = cluster_data_for_ordinal_classification(args.num_clusters, data_to_cluster)
+        print(labels)
 
         # Visualizing only for positional clusters (using X/Y coordinates)
-        for indx, label in enumerate(np.unique(labels[cluster_type])):
-            indices = label == labels[cluster_type]
+        for indx, label in enumerate(np.unique(labels)):
+            indices = label == labels
             data.append(go.Scatter(x=scene_data['data']['t1'][indices].to_numpy(),
                                    y=scene_data['data']['t2'][indices].to_numpy(),
                                    mode='markers',
@@ -111,7 +124,7 @@ if __name__ == '__main__':
                                    name='cluster #{}'.format(indx),
                                    text=list(map(lambda fn: f'File: ' + fn, images_names))))
 
-        scene_name_with_label = ['{}{}'.format(scene, i) for i in labels[cluster_type]]
+        scene_name_with_label = ['{}{}'.format(scene, i) for i in labels]
         scene_data['data']['scene'] = scene_name_with_label
 
         if args.viz:
