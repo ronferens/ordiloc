@@ -23,7 +23,7 @@ def verify_input_file(path):
 
 def get_dataset_images_names(paths):
     names = []
-    for img_filename in tqdm(paths):
+    for img_filename in tqdm(paths, desc='loading dataset images'):
         names.append('/'.join(img_filename.split('/')[-2:]))
     return names
 
@@ -60,7 +60,7 @@ def cluster_data_for_ordinal_classification(num_of_segments, data):
 
     # Assigning the new labels
     new_labels = np.zeros_like(init_labels)
-    for idx, l in enumerate(org_labels_order):
+    for idx, l in tqdm(enumerate(org_labels_order), desc='Setting best labels for ordinal classification'):
         indices = l == init_labels
         new_labels[indices] = new_labels_order[idx]
 
@@ -79,63 +79,48 @@ if __name__ == '__main__':
 
     # Setting input scene and path
     # ============================
-    path = args.dataset_path
+    input_file = args.dataset_path
     scene = args.scene
+    scene_data = {}
 
-    types = ['train', 'test']
-    scene_data = {'train': {}, 'test': {}}
-    data = []
-    for data_type in types:
-        # Retrieving input files (train and test)
-        files = [join(path, f) for f in listdir(path) if isfile(join(path, f))]
-        for f in files:
-            if scene in f and data_type in f:
-                input_file = f
-        verify_input_file(input_file)
+    for cluster_type in ['position', 'orientation']:
+        data = []
+        labels = {}
 
         # Reading the train/test data
-        scene_data[data_type]['data'] = pd.read_csv(input_file)
+        scene_data['data'] = pd.read_csv(input_file)
 
-        images_names = get_dataset_images_names(scene_data[data_type]['data']['img_path'])
+        images_names = get_dataset_images_names(scene_data['data']['img_path'])
         num_of_imgs = len(images_names)
-        scene_data[data_type]['imgs'] = images_names
+        scene_data['imgs'] = images_names
 
-        labels = {}
-        if data_type == 'train':
-            for cluster_type in ['position', 'orientation']:
-                # Clustering the training data and set initial labels
-                if cluster_type == 'position':
-                    data_to_cluster = scene_data[data_type]['data'][['t1', 't2', 't3']].to_numpy()
-                else:
-                    data_to_cluster = scene_data[data_type]['data'][['q1', 'q2', 'q3', 'q4']].to_numpy()
-                labels[cluster_type] = cluster_data_for_ordinal_classification(args.num_clusters, data_to_cluster)
-
-                if cluster_type == 'position':
-                    # Visualizing only for positional clusters (using X/Y coordinates)
-                    for indx, label in enumerate(np.unique(labels[cluster_type])):
-                        indices = label == labels[cluster_type]
-                        data.append(go.Scatter(x=scene_data[data_type]['data']['t1'][indices].to_numpy(),
-                                               y=scene_data[data_type]['data']['t2'][indices].to_numpy(),
-                                               mode='markers',
-                                               name='{} cluster #{}'.format(data_type.title(), indx),
-                                               text=list(map(lambda fn: f'File: ' + fn, images_names))))
-
-                    scene_name_with_label = ['{}{}'.format(scene, i) for i in labels[cluster_type]]
-                    scene_data[data_type]['data']['scene'] = scene_name_with_label
+        # Clustering the training data and set initial labels
+        if cluster_type == 'position':
+            data_to_cluster = scene_data['data'][['t1', 't2', 't3']].to_numpy()
         else:
-            # Plotting the test data (black dots)
-            data.append(go.Scatter(x=scene_data[data_type]['data']['t1'].to_numpy(),
-                                   y=scene_data[data_type]['data']['t2'].to_numpy(),
+            data_to_cluster = scene_data['data'][['q1', 'q2', 'q3', 'q4']].to_numpy()
+        labels[cluster_type] = cluster_data_for_ordinal_classification(args.num_clusters, data_to_cluster)
+
+        # Visualizing only for positional clusters (using X/Y coordinates)
+        for indx, label in enumerate(np.unique(labels[cluster_type])):
+            indices = label == labels[cluster_type]
+            data.append(go.Scatter(x=scene_data['data']['t1'][indices].to_numpy(),
+                                   y=scene_data['data']['t2'][indices].to_numpy(),
                                    mode='markers',
-                                   marker=dict(size=8, color='black'),
-                                   name='{} Data'.format(data_type.title()),
+                                   marker=dict(line=dict(color='DarkSlateGrey', width=1)),
+                                   name='cluster #{}'.format(indx),
                                    text=list(map(lambda fn: f'File: ' + fn, images_names))))
 
-    if args.viz:
-        layout = go.Layout(title='Scene Data: <b>{}/{} - {} Segments</b>'.format(args.dataset_name.title(), scene,
-                                                                                 args.num_clusters),
-                           xaxis=dict(title='X Coordinate'),
-                           yaxis=dict(title='Y Coordinate'))
+        scene_name_with_label = ['{}{}'.format(scene, i) for i in labels[cluster_type]]
+        scene_data['data']['scene'] = scene_name_with_label
 
-        save_path = r'scene_train_data_plot_{}_{}.html'.format(args.dataset_name, scene)
-        plotly.offline.plot({'data': data, 'layout': layout}, filename=save_path, auto_open=True)
+        if args.viz:
+            layout = go.Layout(title='Scene Data: <b>{}/{} - {} Segments - {}</b>'.format(args.dataset_name.title(),
+                                                                                          scene,
+                                                                                          args.num_clusters,
+                                                                                          cluster_type.title()),
+                               xaxis=dict(title='X Coordinate'),
+                               yaxis=dict(title='Y Coordinate'))
+
+            save_path = r'{}_{}_{}_segments_{}.html'.format(args.dataset_name, scene, args.num_clusters, cluster_type)
+            plotly.offline.plot({'data': data, 'layout': layout}, filename=save_path, auto_open=True)
