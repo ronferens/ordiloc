@@ -1,14 +1,12 @@
 import numpy as np
 import pandas as pd
-from os import listdir
-from os.path import join, isfile, exists
+from os.path import join, splitext, exists
 from tqdm import tqdm
 import plotly
 import plotly.graph_objs as go
 from plotly.offline import init_notebook_mode
 from sklearn.cluster import KMeans
 import argparse
-from itertools import permutations
 from sklearn.decomposition import PCA
 
 init_notebook_mode(connected=False)
@@ -78,38 +76,36 @@ if __name__ == '__main__':
     # ============================
     input_file = args.dataset_path
     scene = args.scene
-    scene_data = {}
+
+    # Reading the train/test data
+    scene_data = pd.read_csv(input_file)
 
     for cluster_type in ['position', 'orientation']:
         data = []
 
-        # Reading the train/test data
-        scene_data['data'] = pd.read_csv(input_file)
-
-        images_names = get_dataset_images_names(scene_data['data']['img_path'])
+        images_names = get_dataset_images_names(scene_data['img_path'])
         num_of_imgs = len(images_names)
-        scene_data['imgs'] = images_names
 
         # Clustering the training data and set initial labels
         if cluster_type == 'position':
-            data_to_cluster = scene_data['data'][['t1', 't2', 't3']].to_numpy()
+            data_to_cluster = scene_data[['t1', 't2', 't3']].to_numpy()
         else:
-            data_to_cluster = scene_data['data'][['q1', 'q2', 'q3', 'q4']].to_numpy()
+            data_to_cluster = scene_data[['q1', 'q2', 'q3', 'q4']].to_numpy()
 
         labels = get_labels_for_ordinal_classification(args.num_clusters, data_to_cluster)
 
         # Visualizing only for positional clusters (using X/Y coordinates)
         for label in np.unique(labels):
             indices = label == labels
-            data.append(go.Scatter(x=scene_data['data']['t1'][indices].to_numpy(),
-                                   y=scene_data['data']['t2'][indices].to_numpy(),
+            data.append(go.Scatter(x=scene_data['t1'][indices].to_numpy(),
+                                   y=scene_data['t2'][indices].to_numpy(),
                                    mode='markers',
                                    marker=dict(line=dict(color='DarkSlateGrey', width=1)),
                                    name='cluster #{}'.format(label),
                                    text=list(map(lambda fn: f'File: ' + fn, images_names))))
 
-        scene_name_with_label = ['{}{}'.format(scene, i) for i in labels]
-        scene_data['data']['scene'] = scene_name_with_label
+        # Adding the labels to the dataset data
+        scene_data['class_{}'.format(cluster_type)] = labels
 
         if args.viz:
             layout = go.Layout(title='Scene Data: <b>{}/{} - {} Segments - {}</b>'.format(args.dataset_name.title(),
@@ -121,3 +117,7 @@ if __name__ == '__main__':
 
             save_path = r'{}_{}_{}_segments_{}.html'.format(args.dataset_name, scene, args.num_clusters, cluster_type)
             plotly.offline.plot({'data': data, 'layout': layout}, filename=save_path, auto_open=True)
+
+    # Saving the dataset data
+    output_file_path = splitext(input_file)[0] + '_{}_classes'.format(args.num_clusters) + splitext(input_file)[1]
+    scene_data.to_csv(output_file_path)
