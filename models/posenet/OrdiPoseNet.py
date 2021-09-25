@@ -20,12 +20,12 @@ class OrdiPoseNet(nn.Module):
         self.backbone = torch.load(backbone_path)
         backbone_dim = config.get('backbone_dim')
         latent_dim = config.get('latent_dim')
-        num_of_segments = config.get('num_of_segments')
+        num_classes = config.get('num_classes')
 
         # Regressor layers
         self.fc1 = nn.Linear(backbone_dim, latent_dim)
-        self.fc2 = nn.Linear(latent_dim, 1)
-        self.fc3 = nn.Linear(latent_dim, 1)
+        self.fc2 = nn.Linear(latent_dim, num_classes)
+        self.fc3 = nn.Linear(latent_dim, num_classes)
 
         self.dropout = nn.Dropout(p=0.1)
         self.avg_pooling_2d = nn.AdaptiveAvgPool2d(1)
@@ -50,8 +50,8 @@ class OrdiPoseNet(nn.Module):
         x = x.flatten(start_dim=1)
 
         x = self.dropout(F.relu(self.fc1(x)))
-        c_x = torch.argmax(F.softmax(self.fc2(x)))
-        c_q = torch.argmax(F.softmax(self.fc3(x)))
+        c_x = F.sigmoid(self.fc2(x))
+        c_q = F.sigmoid(self.fc3(x))
 
-        return {'pose': torch.cat((c_x, c_q), dim=1)}
+        return {'pose': torch.stack((c_x, c_q), dim=2)}
 

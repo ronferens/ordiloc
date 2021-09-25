@@ -19,8 +19,8 @@ class CameraPoseDataset(Dataset):
         """
         super(CameraPoseDataset, self).__init__()
         # self.img_paths, self.poses = read_labels_file(labels_file, dataset_path)
-        self.img_paths, self.poses = read_labels_classes_file(labels_file, dataset_path)
-        self.dataset_size = self.poses.shape[0]
+        self.img_paths, self.pose_classes = read_labels_classes_file(labels_file, dataset_path)
+        self.dataset_size = self.pose_classes.shape[0]
         self.transform = data_transform
 
     def __len__(self):
@@ -28,11 +28,12 @@ class CameraPoseDataset(Dataset):
 
     def __getitem__(self, idx):
         img = imread(self.img_paths[idx])
-        pose = self.poses[idx]
+        # pose = self.poses[idx]
+        pose_classes = self.pose_classes[idx]
         if self.transform:
             img = self.transform(img)
 
-        sample = {'img': img, 'pose': pose}
+        sample = {'img': img, 'pose_classes': pose_classes}
         return sample
 
 
@@ -55,7 +56,7 @@ def read_labels_classes_file(labels_file, dataset_path):
     df = pd.read_csv(labels_file)
     imgs_paths = [join(dataset_path, path) for path in df['img_path'].values]
     n = df.shape[0]
-    poses = np.zeros((n, 2))
-    poses[:, 0] = df['c_pos'].values
-    poses[:, 1] = df['c_orientation'].values
-    return imgs_paths, poses
+    classes = np.zeros((n, 2))
+    classes[:, 0] = df['class_position'].values
+    classes[:, 1] = df['class_orientation'].values
+    return imgs_paths, classes

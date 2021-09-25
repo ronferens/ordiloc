@@ -60,6 +60,7 @@ if __name__ == "__main__":
 
     # Create the model
     model = get_model(args.model_name, args.backbone_path, config).to(device)
+
     # Load the checkpoint if needed
     if args.checkpoint_path:
         model.load_state_dict(torch.load(args.checkpoint_path, map_location=device_id))
@@ -131,7 +132,8 @@ if __name__ == "__main__":
             for batch_idx, minibatch in enumerate(dataloader):
                 for k, v in minibatch.items():
                     minibatch[k] = v.to(device)
-                gt_pose = minibatch.get('pose').to(dtype=torch.float32)
+                # gt_pose = minibatch.get('pose').to(dtype=torch.float32)
+                gt_pose = minibatch.get('pose_classes').to(dtype=torch.float32)
                 batch_size = gt_pose.shape[0]
                 n_samples += batch_size
                 n_total_samples += batch_size
@@ -166,12 +168,19 @@ if __name__ == "__main__":
 
                 # Record loss and performance on train set
                 if batch_idx % n_freq_print == 0:
-                    posit_err, orient_err = utils.pose_err(est_pose.detach(), gt_pose.detach())
+                    # posit_err, orient_err = utils.pose_err(est_pose, gt_pose)
+                    pose_class_err, orient_class_err = utils.pose_class_err(est_pose.detach(), gt_pose.detach())
+                    # logging.info("[Batch-{}/Epoch-{}] running camera pose loss: {:.3f}, "
+                    #              "camera pose error: {:.2f}[m], {:.2f}[deg]".format(
+                    #                                                     batch_idx+1, epoch+1, (running_loss/n_samples),
+                    #                                                     posit_err.mean().item(),
+                    #                                                     orient_err.mean().item()))
                     logging.info("[Batch-{}/Epoch-{}] running camera pose loss: {:.3f}, "
-                                 "camera pose error: {:.2f}[m], {:.2f}[deg]".format(
-                                                                        batch_idx+1, epoch+1, (running_loss/n_samples),
-                                                                        posit_err.mean().item(),
-                                                                        orient_err.mean().item()))
+                                 "Pose class error: Position={:.2f}%, Orientation={:.2f}%".format(
+                        batch_idx + 1, epoch + 1, (running_loss / n_samples),
+                        100. * torch.sum(pose_class_err).item() / pose_class_err.shape[0],
+                        100. * torch.sum(orient_class_err).item() / pose_class_err.shape[0]))
+
             # Save checkpoint
             if (epoch % n_freq_checkpoint) == 0 and epoch > 0:
                 torch.save(model.state_dict(), checkpoint_prefix + '_checkpoint-{}.pth'.format(epoch))
@@ -205,7 +214,8 @@ if __name__ == "__main__":
                 for k, v in minibatch.items():
                     minibatch[k] = v.to(device)
 
-                gt_pose = minibatch.get('pose').to(dtype=torch.float32)
+                # gt_pose = minibatch.get('pose').to(dtype=torch.float32)
+                gt_pose = minibatch.get('pose_classes').to(dtype=torch.float32)
 
                 # Forward pass to predict the pose
                 tic = time.time()
@@ -213,17 +223,27 @@ if __name__ == "__main__":
                 toc = time.time()
 
                 # Evaluate error
-                posit_err, orient_err = utils.pose_err(est_pose, gt_pose)
+                # posit_err, orient_err = utils.pose_err(est_pose, gt_pose)
+                #
+                # # Collect statistics
+                # stats[i, 0] = posit_err.item()
+                # stats[i, 1] = orient_err.item()
+                # stats[i, 2] = (toc - tic)*1000
+                #
+                # logging.info("Pose error: {:.3f}[m], {:.3f}[deg], inferred in {:.2f}[ms]".format(
+                #     stats[i, 0],  stats[i, 1],  stats[i, 2]))
 
+                pose_class_err, orient_class_err = utils.pose_class_err(est_pose.detach(), gt_pose.detach())
+                logging.info("Pose class error: Position={}, Orientation={}".format(pose_class_err.item(),
+                                                                                    orient_class_err.item()))
                 # Collect statistics
-                stats[i, 0] = posit_err.item()
-                stats[i, 1] = orient_err.item()
-                stats[i, 2] = (toc - tic)*1000
-
-                logging.info("Pose error: {:.3f}[m], {:.3f}[deg], inferred in {:.2f}[ms]".format(
-                    stats[i, 0],  stats[i, 1],  stats[i, 2]))
+                stats[i, 0] = pose_class_err.item()
+                stats[i, 1] = orient_class_err.item()
+                stats[i, 2] = (toc - tic) * 1000.
 
         # Record overall statistics
         logging.info("Performance of {} on {}".format(args.checkpoint_path, args.labels_file))
-        logging.info("Median pose error: {:.3f}[m], {:.3f}[deg]".format(np.nanmedian(stats[:, 0]), np.nanmedian(stats[:, 1])))
+        logging.info("Pose class error: Position={:.2f}%, Orientation={:.2f}%".format(
+            100. * np.sum(stats[:, 0])/stats.shape[0],
+            100. * np.sum(stats[:, 1]/stats.shape[0])))
         logging.info("Mean inference time:{:.2f}[ms]".format(np.mean(stats[:, 2])))

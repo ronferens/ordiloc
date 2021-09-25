@@ -54,9 +54,18 @@ def init_logger():
         logging.getLogger(PIL.__name__).setLevel(logging.WARNING)
 
 
-
 # Evaluation utils
 ##########################
+def convert_pose_labels_to_classes(num_segments, labels):
+    pose_class = torch.zeros((labels.shape[0], num_segments, 2)).to(labels.device)
+
+    for i, target in enumerate(labels):
+        pose_class[i, 0:(target[0].int() + 1), 0] = 1
+        pose_class[i, 0:(target[1].int() + 1), 1] = 1
+
+    return pose_class
+
+
 def pose_err(est_pose, gt_pose):
     """
     Calculate the position and orientation error given the estimated and ground truth pose(s
@@ -72,6 +81,26 @@ def pose_err(est_pose, gt_pose):
     orient_err = 2 * torch.acos(torch.abs(inner_prod)) * 180 / np.pi
     return posit_err, orient_err
 
+
+def converrt_pred_to_label(pred: np.ndarray):
+    return (pred > 0.5).cumprod(axis=1).sum(axis=1) - 1
+
+
+def pose_class_err(preds, gt_labels):
+    """
+    Calculate the position and orientation error given the estimated and ground truth pose(s
+    :param preds: (torch.Tensor) a batch of estimated poses (Nx7, N is the batch size)
+    :param gt_pose: (torch.Tensor) a batch of ground-truth poses (Nx7, N is the batch size)
+    :return: position error(s) and orientation errors(s)
+    """
+    est_position_class = converrt_pred_to_label(preds[:, :, 0])
+    est_orientation_class = converrt_pred_to_label(preds[:, :, 1])
+
+    pose_class_err = est_position_class == gt_labels[:, 0]
+    orient_class_err = est_orientation_class == gt_labels[:, 1]
+    return pose_class_err, orient_class_err
+
+
 # Plotting utils
 ##########################
 def plot_loss_func(sample_count, loss_vals, loss_fig_path):
@@ -82,6 +111,7 @@ def plot_loss_func(sample_count, loss_vals, loss_fig_path):
     plt.xlabel('Number of samples')
     plt.ylabel('Loss')
     plt.savefig(loss_fig_path)
+
 
 # Augmentations
 train_transforms = {
@@ -103,6 +133,3 @@ test_transforms = {
                                                              std=[0.229, 0.224, 0.225])
         ])
 }
-
-
-

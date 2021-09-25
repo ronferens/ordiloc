@@ -13,8 +13,8 @@ def get_model(model_name, backbone_path, config):
     """
     if model_name == 'posenet':
         return PoseNet(config, backbone_path)
-    elif model_name == 'interposenet':
-        return InterPoseNet(config, backbone_path)
+    elif model_name == 'ordiposenet':
+        return OrdiPoseNet(config, backbone_path)
     elif model_name == 'transposenet':
         return TransPoseNet(config, backbone_path)
     else:

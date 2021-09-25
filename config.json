@@ -21,7 +21,7 @@
 		"latent_dim": 1024
 	},
 	"ordiposenet": {
-		"batch_size": 32,
+		"batch_size": 64,
 		"learnable": true,
 		"s_x": -3.0,
 		"s_q": -6.5,
@@ -34,7 +34,7 @@
 		"n_epochs": 600,
 		"backbone_dim": 1280,
 		"latent_dim": 1024,
-		"num_of_segments": 5,
+		"num_classes": 4,
 		"inter_loss_weight": 0.5
 	},
 	"transposenet": {

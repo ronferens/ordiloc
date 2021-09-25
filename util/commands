@@ -1,1 +1,19 @@
-posenet train models/backbones/efficient-net-b0.pth /mnt/data/datasets/cambridge datasets/CambridgeLandmarks/abs_cambridge_pose_sorted.csv_ShopFacade_train.csv
+# ===================================
+# Train
+# ===================================
+ordiposenet
+train
+models/backbones/efficient-net-b0.pth
+/media/ronf/data/datasets/cambridge
+datasets/CambridgeLandmarks/abs_cambridge_pose_sorted.csv_ShopFacade_train_4_classes.csv
+
+# ===================================
+# Test
+# ===================================
+ordiposenet
+test
+models/backbones/efficient-net-b0.pth
+/media/ronf/data/datasets/cambridge
+datasets/CambridgeLandmarks/abs_cambridge_pose_sorted.csv_ShopFacade_test_4_classes.csv
+--checkpoint_path
+./out/run_24_09_21_18_47_final.pth
