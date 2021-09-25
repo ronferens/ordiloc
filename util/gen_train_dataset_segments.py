@@ -77,7 +77,7 @@ if __name__ == '__main__':
     input_file = args.dataset_path
     scene = args.scene
 
-    # Reading the train/test data
+    # Reading the train data
     scene_data = pd.read_csv(input_file)
 
     for cluster_type in ['position', 'orientation']:
