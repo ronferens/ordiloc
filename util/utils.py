@@ -82,8 +82,9 @@ def pose_err(est_pose, gt_pose):
     return posit_err, orient_err
 
 
-def converrt_pred_to_label(pred: np.ndarray):
-    return (pred > 0.5).cumprod(axis=1).sum(axis=1) - 1
+def convert_pred_to_label(pred):
+    labels = torch.nn.functional.relu((pred > 0.5).cumprod(axis=1).sum(axis=1) - 1)
+    return labels
 
 
 def pose_class_err(preds, gt_labels):
@@ -93,8 +94,8 @@ def pose_class_err(preds, gt_labels):
     :param gt_pose: (torch.Tensor) a batch of ground-truth poses (Nx7, N is the batch size)
     :return: position error(s) and orientation errors(s)
     """
-    est_position_class = converrt_pred_to_label(preds[:, :, 0])
-    est_orientation_class = converrt_pred_to_label(preds[:, :, 1])
+    est_position_class = convert_pred_to_label(preds[:, :, 0])
+    est_orientation_class = convert_pred_to_label(preds[:, :, 1])
 
     pose_class_err = est_position_class == gt_labels[:, 0]
     orient_class_err = est_orientation_class == gt_labels[:, 1]

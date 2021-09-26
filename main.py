@@ -9,7 +9,7 @@ import logging
 from util import utils
 import time
 from datasets.CameraPoseDataset import CameraPoseDataset
-from models.pose_losses import CameraPoseOrdinalLoss
+from models.pose_losses import CameraPoseLoss, CameraPoseOrdinalLoss
 from models.pose_regressors import get_model
 from os.path import join
 from sklearn.metrics import confusion_matrix
@@ -168,9 +168,8 @@ if __name__ == "__main__":
                         parameter.requires_grad_(False)
 
         # Set the loss
-        # pose_loss = CameraPoseLoss(config).to(device)
-        nll_loss = torch.nn.NLLLoss()
-        pose_loss = CameraPoseOrdinalLoss(config).to(device)
+        pose_loss = CameraPoseLoss(config).to(device)
+        pose_ordi_loss = CameraPoseOrdinalLoss(config).to(device)
 
         # Set the optimizer and scheduler
         params = list(model.parameters()) + list(pose_loss.parameters())
@@ -199,8 +198,9 @@ if __name__ == "__main__":
         n_freq_print = config.get("n_freq_print")
         n_freq_checkpoint = config.get("n_freq_checkpoint")
         n_epochs = config.get("n_epochs")
+        ordi_loss_weight = config.get("ordi_loss_weight")
 
-        # Train
+        #  Train
         checkpoint_prefix = join(utils.create_output_dir('out'),utils.get_stamp_from_log())
         n_total_samples = 0.0
         loss_vals = []
@@ -214,30 +214,23 @@ if __name__ == "__main__":
             for batch_idx, minibatch in enumerate(dataloader):
                 for k, v in minibatch.items():
                     minibatch[k] = v.to(device)
-                # gt_pose = minibatch.get('pose').to(dtype=torch.float32)
-                gt_pose = minibatch.get('pose_classes').to(dtype=torch.float32)
+
+                gt_pose = minibatch.get('pose').to(dtype=torch.float32)
+                gt_pose_cls = minibatch.get('pose_cls').to(dtype=torch.float32)
                 batch_size = gt_pose.shape[0]
                 n_samples += batch_size
                 n_total_samples += batch_size
-
-                if freeze:  # For TransPoseNet
-                    model.eval()
-                    with torch.no_grad():
-                        transformers_res = model.forward_transformers(minibatch)
-                    model.train()
 
                 # Zero the gradients
                 optim.zero_grad()
 
                 # Forward pass to estimate the pose
-                if freeze:
-                    res = model.forward_heads(transformers_res)
-                else:
-                    res = model(minibatch)
-
+                res = model(minibatch)
                 est_pose = res.get('pose')
+                est_pose_cls = res.get('pose_cls')
+
                 # Pose loss
-                criterion = pose_loss(est_pose, gt_pose)
+                criterion = pose_loss(est_pose, gt_pose) + ordi_loss_weight * pose_ordi_loss(est_pose_cls, gt_pose_cls)
 
                 # Collect for recoding and plotting
                 running_loss += criterion.item()
@@ -250,13 +243,14 @@ if __name__ == "__main__":
 
                 # Record loss and performance on train set
                 if batch_idx % n_freq_print == 0:
-                    # posit_err, orient_err = utils.pose_err(est_pose, gt_pose)
-                    pose_class_err, orient_class_err = utils.pose_class_err(est_pose.detach(), gt_pose.detach())
-                    # logging.info("[Batch-{}/Epoch-{}] running camera pose loss: {:.3f}, "
-                    #              "camera pose error: {:.2f}[m], {:.2f}[deg]".format(
-                    #                                                     batch_idx+1, epoch+1, (running_loss/n_samples),
-                    #                                                     posit_err.mean().item(),
-                    #                                                     orient_err.mean().item()))
+                    posit_err, orient_err = utils.pose_err(est_pose, gt_pose)
+                    logging.info("[Batch-{}/Epoch-{}] running camera pose loss: {:.3f}, "
+                                 "camera pose error: {:.2f}[m], {:.2f}[deg]".format(
+                                                                        batch_idx+1, epoch+1, (running_loss/n_samples),
+                                                                        posit_err.mean().item(),
+                                                                        orient_err.mean().item()))
+
+                    pose_class_err, orient_class_err = utils.pose_class_err(est_pose_cls.detach(), gt_pose_cls.detach())
                     logging.info("[Batch-{}/Epoch-{}] running camera pose loss: {:.3f}, "
                                  "Pose class error: Position={:.2f}%, Orientation={:.2f}%".format(
                         batch_idx + 1, epoch + 1, (running_loss / n_samples),
@@ -271,13 +265,14 @@ if __name__ == "__main__":
             scheduler.step()
 
         logging.info('Training completed')
-        torch.save(model.state_dict(), checkpoint_prefix + '_final.pth'.format(epoch))
+        logging.info('Final mode: ' + checkpoint_prefix + '_final.pth')
+        torch.save(model.state_dict(), checkpoint_prefix + '_final.pth')
 
         # Plot the loss function
         loss_fig_path = checkpoint_prefix + "_loss_fig.png"
         utils.plot_loss_func(sample_count, loss_vals, loss_fig_path)
 
-    else: # Test
+    else:  # Test
         # Set to eval mode
         model.eval()
 
@@ -289,53 +284,61 @@ if __name__ == "__main__":
                          'num_workers': config.get('n_workers')}
         dataloader = torch.utils.data.DataLoader(dataset, **loader_params)
 
-        stats = np.zeros((len(dataloader.dataset), 3))
+        stats = np.zeros((len(dataloader.dataset), 5))
 
-        gt_labels = []
-        preds = []
+        gt_cls = []
+        preds_cls = []
 
         with torch.no_grad():
             for i, minibatch in enumerate(dataloader, 0):
                 for k, v in minibatch.items():
                     minibatch[k] = v.to(device)
 
-                # gt_pose = minibatch.get('pose').to(dtype=torch.float32)
-                gt_pose = minibatch.get('pose_classes').to(dtype=torch.float32)
+                gt_pose = minibatch.get('pose').to(dtype=torch.float32)
+                gt_pose_cls = minibatch.get('pose_cls').to(dtype=torch.float32)
 
                 # Forward pass to predict the pose
                 tic = time.time()
-                est_pose = model(minibatch).get('pose')
+                res = model(minibatch)
                 toc = time.time()
 
+                est_pose = res.get('pose')
+                est_pose_cls = res.get('pose_cls')
+
                 # Evaluate error
-                # posit_err, orient_err = utils.pose_err(est_pose, gt_pose)
-                #
-                # # Collect statistics
-                # stats[i, 0] = posit_err.item()
-                # stats[i, 1] = orient_err.item()
-                # stats[i, 2] = (toc - tic)*1000
-                #
-                # logging.info("Pose error: {:.3f}[m], {:.3f}[deg], inferred in {:.2f}[ms]".format(
-                #     stats[i, 0],  stats[i, 1],  stats[i, 2]))
+                posit_err, orient_err = utils.pose_err(est_pose, gt_pose)
 
-                gt_labels.append(gt_pose.data.cpu().numpy())
-                preds.append(utils.converrt_pred_to_label(est_pose.data.cpu().numpy()))
+                # Collect statistics
+                stats[i, 0] = posit_err.item()
+                stats[i, 1] = orient_err.item()
+                stats[i, 2] = (toc - tic)*1000
 
-                pose_class_err, orient_class_err = utils.pose_class_err(est_pose.detach(), gt_pose.detach())
+                logging.info("Pose error: {:.3f}[m], {:.3f}[deg], inferred in {:.2f}[ms]".format(
+                    stats[i, 0],  stats[i, 1],  stats[i, 2]))
+
+                gt_cls.append(gt_pose_cls.data.cpu().numpy())
+
+                # Saving the predictions for the final confusion matrix
+                preds_cls.append(utils.converrt_pred_to_label(est_pose_cls.data.cpu().numpy()))
+
+                pose_class_err, orient_class_err = utils.pose_class_err(est_pose_cls.detach(), gt_pose_cls.detach())
                 logging.info("Pose class error: Position={}, Orientation={}".format(pose_class_err.item(),
                                                                                     orient_class_err.item()))
                 # Collect statistics
-                stats[i, 0] = pose_class_err.item()
-                stats[i, 1] = orient_class_err.item()
-                stats[i, 2] = (toc - tic) * 1000.
+                stats[i, 3] = pose_class_err.item()
+                stats[i, 4] = orient_class_err.item()
 
         # Record overall statistics
         logging.info("Performance of {} on {}".format(args.checkpoint_path, args.labels_file))
-        logging.info("Pose class error: Position={:.2f}%, Orientation={:.2f}%".format(
-            100. * np.sum(stats[:, 0])/stats.shape[0],
-            100. * np.sum(stats[:, 1]/stats.shape[0])))
-        logging.info("Mean inference time:{:.2f}[ms]".format(np.mean(stats[:, 2])))
+        logging.info("\tMedian pose error: {:.3f}[m], {:.3f}[deg]".format(np.nanmedian(stats[:, 0]),
+                                                                        np.nanmedian(stats[:, 1])))
+        logging.info("\tPose class error: Position={:.2f}%, Orientation={:.2f}%".format(
+            100. * np.sum(stats[:, 3])/stats.shape[0],
+            100. * np.sum(stats[:, 4]/stats.shape[0])))
+        logging.info("\tMean inference time:{:.2f}[ms]".format(np.mean(stats[:, 2])))
 
-        conf_matrix = confusion_matrix(y_true=np.array(preds)[:, 0, 0], y_pred=np.array(gt_labels)[:, 0, 0])
-        target_names = ['Segment #{}'.format(i) for i in range(4)]
-        plot_confusion_matrix(conf_matrix, target_names, title='Confusion matrix', cmap=None, normalize=True)
+        for indx, cluster_type in enumerate(['Position', 'Orientation']):
+            conf_matrix = confusion_matrix(y_true=np.array(preds_cls)[:, 0, indx], y_pred=np.array(gt_cls)[:, 0, indx])
+            target_names = ['Segment #{}'.format(i) for i in range(4)]
+            plot_confusion_matrix(conf_matrix, target_names, title='Confusion matrix - ' + cluster_type, cmap=None,
+                                  normalize=True)

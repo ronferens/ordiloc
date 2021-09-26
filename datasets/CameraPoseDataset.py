@@ -18,8 +18,8 @@ class CameraPoseDataset(Dataset):
         :return: an instance of the class
         """
         super(CameraPoseDataset, self).__init__()
-        # self.img_paths, self.poses = read_labels_file(labels_file, dataset_path)
-        self.img_paths, self.pose_classes = read_labels_classes_file(labels_file, dataset_path)
+        self.img_paths, self.poses = read_labels_file(labels_file, dataset_path)
+        _, self.pose_classes = read_labels_classes_file(labels_file, dataset_path)
         self.dataset_size = self.pose_classes.shape[0]
         self.transform = data_transform
 
@@ -28,12 +28,12 @@ class CameraPoseDataset(Dataset):
 
     def __getitem__(self, idx):
         img = imread(self.img_paths[idx])
-        # pose = self.poses[idx]
-        pose_classes = self.pose_classes[idx]
+        pose = self.poses[idx]
+        pose_cls = self.pose_classes[idx]
         if self.transform:
             img = self.transform(img)
 
-        sample = {'img': img, 'pose_classes': pose_classes}
+        sample = {'img': img, 'pose': pose, 'pose_cls': pose_cls}
         return sample
 
 

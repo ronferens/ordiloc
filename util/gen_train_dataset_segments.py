@@ -28,26 +28,27 @@ def get_dataset_images_names(paths):
 
 
 def get_labels_for_ordinal_classification(num_of_segments, data):
-    # Performing PCA to project the data into 1D array
+    # Performing PCA to project the data into 2D array
     pca = PCA(n_components=2)
     data_pca = pca.fit(data).transform(data)
 
-    # Clustering the 1D projected data and sorting by centroids
+    # Clustering the 2D projected data and sorting by centroids
     kmeans = KMeans(n_clusters=num_of_segments, random_state=0).fit(data_pca)
     centroids = kmeans.cluster_centers_
 
     # Debug visualization of segmented clusters
     # -----------------------------------------
-    # import matplotlib.pyplot as plt
-    # plt.figure()
-    # for i in range(num_of_segments):
-    #     indices = i == kmeans.labels_
-    #     plt.scatter(data_pca[indices, 0], data_pca[indices, 1], label='label {}'.format(i))
-    #     plt.scatter(centroids[i, 0], centroids[i, 1], label='centroid {}'.format(i))
-    # plt.legend()
-    # plt.grid()
-    # plt.show()
+    import matplotlib.pyplot as plt
+    plt.figure()
+    for i in range(num_of_segments):
+        indices = i == kmeans.labels_
+        plt.scatter(data_pca[indices, 0], data_pca[indices, 1], label='label {}'.format(i))
+        plt.scatter(centroids[i, 0], centroids[i, 1], label='centroid {}'.format(i))
+    plt.legend()
+    plt.grid()
+    plt.show()
 
+    # @TODO: Consider LDA instead of the 1D PCA
     pca_centroids = PCA(n_components=1)
     centroids_pca = pca_centroids.fit(centroids).transform(centroids)
     org_labels_order = np.argsort(centroids_pca.reshape(1, -1))[0]
