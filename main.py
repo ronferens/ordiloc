@@ -13,88 +13,7 @@ from models.pose_losses import CameraPoseLoss, CameraPoseOrdinalLoss
 from models.pose_regressors import get_model
 from os.path import join
 from sklearn.metrics import confusion_matrix
-import matplotlib.pyplot as plt
-
-
-def plot_confusion_matrix(cm,
-                          target_names,
-                          title='Confusion matrix',
-                          cmap=None,
-                          normalize=True):
-    """
-    given a sklearn confusion matrix (cm), make a nice plot
-
-    Arguments
-    ---------
-    cm:           confusion matrix from sklearn.metrics.confusion_matrix
-
-    target_names: given classification classes such as [0, 1, 2]
-                  the class names, for example: ['high', 'medium', 'low']
-
-    title:        the text to display at the top of the matrix
-
-    cmap:         the gradient of the values displayed from matplotlib.pyplot.cm
-                  see http://matplotlib.org/examples/color/colormaps_reference.html
-                  plt.get_cmap('jet') or plt.cm.Blues
-
-    normalize:    If False, plot the raw numbers
-                  If True, plot the proportions
-
-    Usage
-    -----
-    plot_confusion_matrix(cm           = cm,                  # confusion matrix created by
-                                                              # sklearn.metrics.confusion_matrix
-                          normalize    = True,                # show proportions
-                          target_names = y_labels_vals,       # list of names of the classes
-                          title        = best_estimator_name) # title of graph
-
-    Citiation
-    ---------
-    http://scikit-learn.org/stable/auto_examples/model_selection/plot_confusion_matrix.html
-
-    Credit: https://www.kaggle.com/grfiv4/plot-a-confusion-matrix
-    """
-    import matplotlib.pyplot as plt
-    import numpy as np
-    import itertools
-
-    accuracy = np.trace(cm) / float(np.sum(cm))
-    misclass = 1 - accuracy
-
-    if cmap is None:
-        cmap = plt.get_cmap('Blues')
-
-    plt.figure(figsize=(8, 6))
-    plt.imshow(cm, interpolation='nearest', cmap=cmap)
-    plt.title(title)
-    plt.colorbar()
-
-    if target_names is not None:
-        tick_marks = np.arange(len(target_names))
-        plt.xticks(tick_marks, target_names, rotation=45)
-        plt.yticks(tick_marks, target_names)
-
-    if normalize:
-        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
-
-
-    thresh = cm.max() / 1.5 if normalize else cm.max() / 2
-    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
-        if normalize:
-            plt.text(j, i, "{:0.4f}".format(cm[i, j]),
-                     horizontalalignment="center",
-                     color="white" if cm[i, j] > thresh else "black")
-        else:
-            plt.text(j, i, "{:,}".format(cm[i, j]),
-                     horizontalalignment="center",
-                     color="white" if cm[i, j] > thresh else "black")
-
-
-    plt.tight_layout()
-    plt.ylabel('True label')
-    plt.xlabel('Predicted label\naccuracy={:0.4f}; misclass={:0.4f}'.format(accuracy, misclass))
-    plt.show()
-
+from util import plotutils
 
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
@@ -316,11 +235,11 @@ if __name__ == "__main__":
                 logging.info("Pose error: {:.3f}[m], {:.3f}[deg], inferred in {:.2f}[ms]".format(
                     stats[i, 0],  stats[i, 1],  stats[i, 2]))
 
-                gt_cls.append(gt_pose_cls.data.cpu().numpy())
-
                 # Saving the predictions for the final confusion matrix
-                preds_cls.append(utils.converrt_pred_to_label(est_pose_cls.data.cpu().numpy()))
+                preds_cls.append(utils.convert_pred_to_label(est_pose_cls.detach()).data.cpu().numpy())
 
+                # Pose class error on validation set
+                gt_cls.append(gt_pose_cls.data.cpu().numpy())
                 pose_class_err, orient_class_err = utils.pose_class_err(est_pose_cls.detach(), gt_pose_cls.detach())
                 logging.info("Pose class error: Position={}, Orientation={}".format(pose_class_err.item(),
                                                                                     orient_class_err.item()))
@@ -340,5 +259,5 @@ if __name__ == "__main__":
         for indx, cluster_type in enumerate(['Position', 'Orientation']):
             conf_matrix = confusion_matrix(y_true=np.array(preds_cls)[:, 0, indx], y_pred=np.array(gt_cls)[:, 0, indx])
             target_names = ['Segment #{}'.format(i) for i in range(4)]
-            plot_confusion_matrix(conf_matrix, target_names, title='Confusion matrix - ' + cluster_type, cmap=None,
-                                  normalize=True)
+            plotutils.plot_confusion_matrix(conf_matrix, target_names, title='Confusion matrix - ' + cluster_type,
+                                            cmap=None, normalize=True)
