@@ -16,4 +16,12 @@ models/backbones/efficient-net-b0.pth
 /media/ronf/data/datasets/cambridge
 datasets/CambridgeLandmarks/abs_cambridge_pose_sorted.csv_ShopFacade_test_4_classes.csv
 --checkpoint_path
-./out/run_26_09_21_20_58_checkpoint-150.pth
+./out/run_27_09_21_08_28_final.pth
+
+
+
+Cambridge
+../datasets/CambridgeLandmarks/abs_cambridge_pose_sorted.csv_KingsCollege_train_4_classes.csv
+../datasets/CambridgeLandmarks/abs_cambridge_pose_sorted.csv_KingsCollege_test.csv
+ShopFacade
+--viz
