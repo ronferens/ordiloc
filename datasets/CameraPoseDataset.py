@@ -20,7 +20,7 @@ class CameraPoseDataset(Dataset):
         super(CameraPoseDataset, self).__init__()
         self.img_paths, self.poses = read_labels_file(labels_file, dataset_path)
         _, self.pose_classes = read_labels_classes_file(labels_file, dataset_path)
-        self.dataset_size = self.pose_classes.shape[0]
+        self.dataset_size = self.poses.shape[0]
         self.transform = data_transform
 
     def __len__(self):
