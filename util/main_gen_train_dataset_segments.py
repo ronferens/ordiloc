@@ -27,6 +27,16 @@ def get_dataset_images_names(paths):
     return names
 
 
+def get_cluster_centroids(data, num_of_segments, labels):
+    # Finding the centroids of the 1D clusters
+    centroids = np.zeros((num_of_segments, data.shape[1]))
+    for i in range(num_of_segments):
+        indices = i == labels
+        cent = np.mean(data[indices], axis=0)
+        centroids[i, :] = cent
+    return centroids
+
+
 def get_labels_for_ordinal_classification(num_of_segments, data):
     # Clustering the input data
     kmeans = KMeans(n_clusters=num_of_segments, random_state=0).fit(data)
@@ -86,6 +96,8 @@ if __name__ == '__main__':
             data_to_cluster = scene_data[['q1', 'q2', 'q3', 'q4']].to_numpy()
 
         labels = get_labels_for_ordinal_classification(args.num_clusters, data_to_cluster)
+        cluster_centroids = get_cluster_centroids(data_to_cluster, args.num_clusters, labels)
+        centroids = np.zeros(data_to_cluster.shape)
 
         # Visualizing only for positional clusters (using X/Y coordinates)
         for label in np.unique(labels):
@@ -96,9 +108,12 @@ if __name__ == '__main__':
                                    marker=dict(line=dict(color='DarkSlateGrey', width=1)),
                                    name='cluster #{}'.format(label),
                                    text=list(map(lambda fn: f'File: ' + fn, images_names))))
+            centroids[indices, :] = cluster_centroids[label]
 
         # Adding the labels to the dataset data
         scene_data['class_{}'.format(cluster_type)] = labels
+        for i in range(centroids.shape[1]):
+            scene_data['cent_{}_{}'.format(cluster_type, (i + 1))] = centroids[:, i]
 
         if args.viz:
             layout = go.Layout(title='Scene Data: <b>{}/{} - {} Segments - {}</b>'.format(args.dataset_name.title(),
