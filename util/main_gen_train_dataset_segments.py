@@ -85,8 +85,7 @@ if __name__ == '__main__':
         else:
             data_to_cluster = scene_data[['q1', 'q2', 'q3', 'q4']].to_numpy()
 
-        # labels = get_labels_for_ordinal_classification(args.num_clusters, data_to_cluster)
-        labels = get_labels_for_ordinal_classification_1(args.num_clusters, data_to_cluster)
+        labels = get_labels_for_ordinal_classification(args.num_clusters, data_to_cluster)
 
         # Visualizing only for positional clusters (using X/Y coordinates)
         for label in np.unique(labels):
