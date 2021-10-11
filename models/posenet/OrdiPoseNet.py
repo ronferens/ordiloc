@@ -29,15 +29,11 @@ class OrdiPoseNet(nn.Module):
         self.cls_orient = nn.Linear(latent_dim, num_classes_orient)
 
         # Creating the regression heads
-        self.reg_pos = []
-        for n in range(num_classes_pos):
-            self.reg_pos.append(nn.Linear(latent_dim, 3))
-        self.reg_pos = nn.Sequential(*self.reg_pos)
+        self.cls_pos_fc = nn.Linear(num_classes_pos, latent_dim)
+        self.cls_orient_fc = nn.Linear(num_classes_orient, latent_dim)
 
-        self.reg_orient = []
-        for n in range(num_classes_orient):
-            self.reg_orient.append(nn.Linear(latent_dim, 4))
-        self.reg_orient = nn.Sequential(*self.reg_orient)
+        self.reg_pos = nn.Linear(latent_dim, 3)
+        self.reg_orient = nn.Linear(latent_dim, 4)
 
         self.dropout = nn.Dropout(p=0.1)
         self.avg_pooling_2d = nn.AdaptiveAvgPool2d(1)
@@ -72,18 +68,12 @@ class OrdiPoseNet(nn.Module):
         cls_x = F.sigmoid(self.cls_pos(x))
         cls_q = F.sigmoid(self.cls_orient(x))
 
-        batch_size = cls_x.shape[0]
-        p_x = torch.zeros((batch_size, 3)).to(cls_x.device, dtype=cls_x.dtype)
-        p_q = torch.zeros((batch_size, 4)).to(cls_x.device, dtype=cls_x.dtype)
-
         # Regressing the camera pose
-        idx_x = self.convert_pred_to_label(cls_x)
-        for n in range(batch_size):
-            p_x[n, :] = self.reg_pos[idx_x[n]](x[n])
+        cls_x_latent = F.relu(self.cls_pos_fc(cls_x))
+        cls_q_latent = F.relu(self.cls_orient_fc(cls_q))
 
-        idx_q = self.convert_pred_to_label(cls_q)
-        for n in range(batch_size):
-            p_q[n, :] = self.reg_orient[idx_q[n]](x[n])
+        p_x = self.reg_pos(torch.add(x, cls_x_latent))
+        p_q = self.reg_orient(torch.add(x, cls_q_latent))
 
         return {'pose': torch.cat((p_x, p_q), dim=1), 'pose_cls': torch.stack((cls_x, cls_q), dim=2)}
 
