@@ -43,12 +43,20 @@ class OrdiPoseNet(nn.Module):
             if isinstance(m, nn.Linear):
                 torch.nn.init.kaiming_normal_(m.weight)
 
+        # Centroids
+        self._cent_pos = None
+        self._cent_orient = None
+
     @staticmethod
     def convert_pred_to_label(pred):
         label = F.relu(torch.sum(torch.cumprod((pred > 0.5), dim=1), dim=1) - 1)
         return label.to(dtype=torch.int64)
 
-    def forward(self, data):
+    def set_centroids(self, cent_pos, cent_orient):
+        self._cent_pos = cent_pos
+        self._cent_orient = cent_orient
+
+    def forward(self, data, centroids):
         """
         Forward pass
         :param data: (torch.Tensor) dictionary with key-value 'img' -- input image (N X C X H X W)
