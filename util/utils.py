@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch.nn.functional as F
 from torchvision import transforms
+import pandas as pd
 
 # Logging and output utils
 ##########################
@@ -100,6 +101,24 @@ def pose_class_err(preds, gt_labels):
     pose_class_err = est_position_class == gt_labels[:, 0]
     orient_class_err = est_orientation_class == gt_labels[:, 1]
     return pose_class_err, orient_class_err
+
+
+def load_clusters_centroids(input_file):
+    scene_data = pd.read_csv(input_file)
+
+    num_clusters = np.unique(scene_data['class_position'].to_numpy()).shape[0]
+    cent_pos = np.zeros((num_clusters, 3))
+    for l in range(num_clusters):
+        for i in range(3):
+            cent_pos[l, i] = scene_data['cent_position_{}'.format(i + 1)][scene_data['class_position'] == l].iloc[0]
+
+    num_clusters = np.unique(scene_data['class_orientation'].to_numpy()).shape[0]
+    cent_orient = np.zeros((num_clusters, 4))
+    for l in range(num_clusters):
+        for i in range(4):
+            cent_orient[l, i] = scene_data['cent_orientation_{}'.format(i + 1)][scene_data['class_orientation'] == l].iloc[0]
+
+    return cent_pos, cent_orient
 
 
 # Plotting utils
