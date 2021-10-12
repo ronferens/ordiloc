@@ -26,6 +26,7 @@ if __name__ == "__main__":
     arg_parser.add_argument("--checkpoint_path",
                             help="path to a pre-trained model (should match the model indicated in model_name")
     arg_parser.add_argument("--experiment", help="a short string to describe the experiment/commit used")
+    arg_parser.add_argument("--train_labels_file", help="used for loading the clusters' centroids")
 
     args = arg_parser.parse_args()
     utils.init_logger()
@@ -70,6 +71,9 @@ if __name__ == "__main__":
     if args.mode == 'train':
         # Set to train mode
         model.train()
+
+        cent_pos, cent_orient = utils.load_clusters_centroids(args.labels_file)
+        model.set_centroids(cent_pos, cent_orient)
 
         # Freeze parts of the model if indicated
         freeze = config.get("freeze")
@@ -195,6 +199,12 @@ if __name__ == "__main__":
     else:  # Test
         # Set to eval mode
         model.eval()
+
+        if args.train_labels_file is None:
+            raise 'In test mode you must supply the \'train_dataset_path\' argument'
+        else:
+            cent_pos, cent_orient = utils.load_clusters_centroids(args.train_labels_file)
+            model.set_centroids(cent_pos, cent_orient)
 
         # Set the dataset and data loader
         transform = utils.test_transforms.get('baseline')
