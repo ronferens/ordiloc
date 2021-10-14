@@ -5,7 +5,7 @@ ordiposenet
 train
 models/backbones/efficient-net-b0.pth
 /media/ronf/data/datasets/cambridge
-datasets/CambridgeLandmarks/abs_cambridge_pose_sorted.csv_ShopFacade_train_4_classes.csv
+datasets/CambridgeLandmarks/abs_cambridge_pose_sorted.csv_KingsCollege_train_4_classes.csv
 
 # ===================================
 # Test
@@ -14,14 +14,15 @@ ordiposenet
 test
 models/backbones/efficient-net-b0.pth
 /media/ronf/data/datasets/cambridge
-datasets/CambridgeLandmarks/abs_cambridge_pose_sorted.csv_ShopFacade_test_4_classes.csv
+datasets/CambridgeLandmarks/abs_cambridge_pose_sorted.csv_KingsCollege_test_4_classes.csv
+--train_labels_file
+datasets/CambridgeLandmarks/abs_cambridge_pose_sorted.csv_KingsCollege_train_4_classes.csv
 --checkpoint_path
-./out/run_27_09_21_08_28_final.pth
-
+./out/run_13_10_21_16_40_final.pth
 
 
 Cambridge
-../datasets/CambridgeLandmarks/abs_cambridge_pose_sorted.csv_KingsCollege_train_4_classes.csv
+../datasets/CambridgeLandmarks/abs_cambridge_pose_sorted.csv_KingsCollege_train_8_classes.csv
 ../datasets/CambridgeLandmarks/abs_cambridge_pose_sorted.csv_KingsCollege_test.csv
 ShopFacade
 --viz
