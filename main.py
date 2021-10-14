@@ -72,7 +72,7 @@ if __name__ == "__main__":
         # Set to train mode
         model.train()
 
-        cent_pos, cent_orient = utils.load_clusters_centroids(args.labels_file)
+        cent_pos, cent_orient = utils.load_clusters_centroids(args.labels_file, device)
         model.set_centroids(cent_pos, cent_orient)
 
         # Freeze parts of the model if indicated
@@ -154,7 +154,6 @@ if __name__ == "__main__":
 
                 # Pose loss
                 criterion = pose_loss(est_pose, gt_pose) + ordi_loss_weight * pose_ordi_loss(est_pose_cls, gt_pose_cls)
-                # criterion = pose_loss(est_pose, gt_pose)
 
                 # Collect for recoding and plotting
                 running_loss += criterion.item()
@@ -203,7 +202,7 @@ if __name__ == "__main__":
         if args.train_labels_file is None:
             raise 'In test mode you must supply the \'train_dataset_path\' argument'
         else:
-            cent_pos, cent_orient = utils.load_clusters_centroids(args.train_labels_file)
+            cent_pos, cent_orient = utils.load_clusters_centroids(args.train_labels_file, device)
             model.set_centroids(cent_pos, cent_orient)
 
         # Set the dataset and data loader
