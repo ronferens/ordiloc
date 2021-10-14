@@ -80,6 +80,12 @@ def pose_err(est_pose, gt_pose):
     inner_prod = torch.bmm(est_pose_q.view(est_pose_q.shape[0], 1, est_pose_q.shape[1]),
                            gt_pose_q.view(gt_pose_q.shape[0], gt_pose_q.shape[1], 1))
     orient_err = 2 * torch.acos(torch.abs(inner_prod)) * 180 / np.pi
+
+    # import pyquaternion
+    # q1 = pyquaternion.Quaternion(est_pose_q.squeeze().data.cpu().numpy())
+    # q2 = pyquaternion.Quaternion(gt_pose_q.squeeze().data.cpu().numpy())
+    # orient_err = torch.tensor(2 * pyquaternion.Quaternion.absolute_distance(q1, q2) * 180 / np.pi)
+
     return posit_err, orient_err
 
 
