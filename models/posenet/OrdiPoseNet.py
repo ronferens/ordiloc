@@ -56,7 +56,7 @@ class OrdiPoseNet(nn.Module):
         self._cent_pos = cent_pos
         self._cent_orient = cent_orient
 
-    def forward(self, data, centroids):
+    def forward(self, data):
         """
         Forward pass
         :param data: (torch.Tensor) dictionary with key-value 'img' -- input image (N X C X H X W)
@@ -77,11 +77,11 @@ class OrdiPoseNet(nn.Module):
         cls_q = F.sigmoid(self.cls_orient(x))
 
         # Regressing the camera pose
-        cls_x_latent = F.relu(self.cls_pos_fc(cls_x))
-        cls_q_latent = F.relu(self.cls_orient_fc(cls_q))
+        # cls_x_latent = F.relu(self.cls_pos_fc(cls_x))
+        # cls_q_latent = F.relu(self.cls_orient_fc(cls_q))
 
-        p_x = self.reg_pos(torch.add(x, cls_x_latent))
-        p_q = self.reg_orient(torch.add(x, cls_q_latent))
+        p_x = self.reg_pos(x) + self._cent_pos[self.convert_pred_to_label(cls_x)]
+        p_q = self.reg_orient(x) + self._cent_orient[self.convert_pred_to_label(cls_q)]
 
         return {'pose': torch.cat((p_x, p_q), dim=1), 'pose_cls': torch.stack((cls_x, cls_q), dim=2)}
 
