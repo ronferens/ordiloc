@@ -103,17 +103,17 @@ def pose_class_err(preds, gt_labels):
     return pose_class_err, orient_class_err
 
 
-def load_clusters_centroids(input_file):
+def load_clusters_centroids(input_file, device):
     scene_data = pd.read_csv(input_file)
 
     num_clusters = np.unique(scene_data['class_position'].to_numpy()).shape[0]
-    cent_pos = np.zeros((num_clusters, 3))
+    cent_pos = torch.zeros((num_clusters, 3)).to(device)
     for l in range(num_clusters):
         for i in range(3):
             cent_pos[l, i] = scene_data['cent_position_{}'.format(i + 1)][scene_data['class_position'] == l].iloc[0]
 
     num_clusters = np.unique(scene_data['class_orientation'].to_numpy()).shape[0]
-    cent_orient = np.zeros((num_clusters, 4))
+    cent_orient = torch.zeros((num_clusters, 4)).to(device)
     for l in range(num_clusters):
         for i in range(4):
             cent_orient[l, i] = scene_data['cent_orientation_{}'.format(i + 1)][scene_data['class_orientation'] == l].iloc[0]
