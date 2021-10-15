@@ -132,6 +132,12 @@ if __name__ == '__main__':
             save_path = r'{}_{}_{}_segments_{}.html'.format(args.dataset_name, scene, num_clusters, cluster_type)
             plotly.offline.plot({'data': data, 'layout': layout}, filename=save_path, auto_open=True)
 
+        if cluster_type == 'position':
+            num_clusters_pose = num_clusters
+        else:
+            num_clusters_orient = num_clusters
+
     # Saving the dataset data
-    output_file_path = splitext(input_test_file)[0] + '_{}_classes'.format(num_clusters) + splitext(input_test_file)[1]
+    output_file_path = splitext(input_test_file)[0] + '_{}_{}_classes'.format(num_clusters_pose, num_clusters_orient) +\
+                       splitext(input_test_file)[1]
     scene_test_data.to_csv(output_file_path)
