@@ -65,12 +65,14 @@ def get_labels_for_ordinal_classification(num_of_segments, data):
 
     return new_labels
 
+
 if __name__ == '__main__':
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument('dataset_name', help='The dataset name', type=str)
     arg_parser.add_argument('dataset_path', help='The path to the dataset .csv file', type=str)
     arg_parser.add_argument('scene', help='The name of the scene to cluster', type=str)
-    arg_parser.add_argument('num_clusters', help='Number of clusters in the dataset', type=int)
+    arg_parser.add_argument('num_clusters_pose', help='Number of pose clusters in the dataset', type=int)
+    arg_parser.add_argument('num_clusters_orient', help='Number of orientation clusters in the dataset', type=int)
     arg_parser.add_argument('--viz', help='Indicates whether to visualize the positional clustering',
                             action='store_true', default=False)
     args = arg_parser.parse_args()
@@ -92,11 +94,13 @@ if __name__ == '__main__':
         # Clustering the training data and set initial labels
         if cluster_type == 'position':
             data_to_cluster = scene_data[['t1', 't2', 't3']].to_numpy()
+            num_clusters = args.num_clusters_pose
         else:
             data_to_cluster = scene_data[['q1', 'q2', 'q3', 'q4']].to_numpy()
+            num_clusters = args.num_clusters_orient
 
-        labels = get_labels_for_ordinal_classification(args.num_clusters, data_to_cluster)
-        cluster_centroids = get_cluster_centroids(data_to_cluster, args.num_clusters, labels)
+        labels = get_labels_for_ordinal_classification(num_clusters, data_to_cluster)
+        cluster_centroids = get_cluster_centroids(data_to_cluster, num_clusters, labels)
         centroids = np.zeros(data_to_cluster.shape)
 
         # Visualizing only for positional clusters (using X/Y coordinates)
@@ -118,14 +122,16 @@ if __name__ == '__main__':
         if args.viz:
             layout = go.Layout(title='Scene Data: <b>{}/{} - {} Segments - {}</b>'.format(args.dataset_name.title(),
                                                                                           scene,
-                                                                                          args.num_clusters,
+                                                                                          num_clusters,
                                                                                           cluster_type.title()),
                                xaxis=dict(title='X Coordinate'),
                                yaxis=dict(title='Y Coordinate'))
 
-            save_path = r'{}_{}_{}_segments_{}.html'.format(args.dataset_name, scene, args.num_clusters, cluster_type)
+            save_path = r'{}_{}_{}_segments_{}.html'.format(args.dataset_name, scene, num_clusters, cluster_type)
             plotly.offline.plot({'data': data, 'layout': layout}, filename=save_path, auto_open=True)
 
     # Saving the dataset data
-    output_file_path = splitext(input_file)[0] + '_{}_classes'.format(args.num_clusters) + splitext(input_file)[1]
+    output_file_path = splitext(input_file)[0] + '_{}_{}_classes'.format(args.num_clusters_pose,
+                                                                         args.num_clusters_orient) +\
+                       splitext(input_file)[1]
     scene_data.to_csv(output_file_path)
