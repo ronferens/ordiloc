@@ -14,6 +14,7 @@ from models.pose_regressors import get_model
 from os.path import join
 from sklearn.metrics import confusion_matrix
 from util import plotutils
+from util import visdomutils
 
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
@@ -59,6 +60,11 @@ if __name__ == "__main__":
         device_id = config.get('device_id')
     np.random.seed(numpy_seed)
     device = torch.device(device_id)
+
+    # Init Visdom context
+    visdom_active = config.get('device_id')
+    if visdom_active:
+        plotter = visdomutils.VisdomLinePlotter(env_name=utils.get_stamp_from_log())
 
     # Create the model
     model = get_model(args.model_name, args.backbone_path, config).to(device)
@@ -132,6 +138,8 @@ if __name__ == "__main__":
 
             # Resetting temporal loss used for logging
             running_loss = 0.0
+            running_loss_pose = 0.0
+            running_loss_pose_ordi = 0.0
             n_samples = 0
 
             for batch_idx, minibatch in enumerate(dataloader):
@@ -152,11 +160,16 @@ if __name__ == "__main__":
                 est_pose = res.get('pose')
                 est_pose_cls = res.get('pose_cls')
 
-                # Pose loss
-                criterion = pose_loss(est_pose, gt_pose) + ordi_loss_weight * pose_ordi_loss(est_pose_cls, gt_pose_cls)
+                # Calculating the losses
+                pose_loss_val = pose_loss(est_pose, gt_pose)
+                pose_ordi_loss_val = ordi_loss_weight * pose_ordi_loss(est_pose_cls, gt_pose_cls)
+                criterion = pose_loss_val + pose_ordi_loss_val
+                # criterion = pose_loss(est_pose, gt_pose) + ordi_loss_weight * pose_ordi_loss(est_pose_cls, gt_pose_cls)
 
                 # Collect for recoding and plotting
                 running_loss += criterion.item()
+                running_loss_pose += pose_loss_val.item()
+                running_loss_pose_ordi += pose_ordi_loss_val.item()
                 loss_vals.append(criterion.item())
                 sample_count.append(n_total_samples)
 
@@ -179,6 +192,11 @@ if __name__ == "__main__":
                         batch_idx + 1, epoch + 1, (running_loss / n_samples),
                         100. * torch.sum(pose_class_err).item() / pose_class_err.shape[0],
                         100. * torch.sum(orient_class_err).item() / pose_class_err.shape[0]))
+
+            if visdom_active:
+                plotter.plot('pose_loss', 'train', 'Pose Loss', epoch, pose_loss_val.item())
+                plotter.plot('pose_ordi_loss', 'train', 'Ordinal Classification Loss', epoch, pose_ordi_loss_val.item())
+                plotter.plot('running_loss', 'train', 'Running Loss', epoch, running_loss)
 
             # Save checkpoint
             if (epoch % n_freq_checkpoint) == 0 and epoch > 0:
