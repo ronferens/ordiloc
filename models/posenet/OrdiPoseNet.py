@@ -81,7 +81,8 @@ class OrdiPoseNet(nn.Module):
         cls_q_latent = F.relu(self.cls_orient_fc(cls_q))
 
         p_x = self.reg_pos(torch.add(x, cls_x_latent)) + self._cent_pos[self.convert_pred_to_label(cls_x)]
-        p_q = self.reg_orient(torch.add(x, cls_q_latent)) + self._cent_orient[self.convert_pred_to_label(cls_q)]
+        p_q = self.reg_orient(torch.add(x, torch.add(cls_x_latent, cls_q_latent))) + \
+              self._cent_orient[self.convert_pred_to_label(cls_q)]
 
         return {'pose': torch.cat((p_x, p_q), dim=1), 'pose_cls': torch.stack((cls_x, cls_q), dim=2)}
 
