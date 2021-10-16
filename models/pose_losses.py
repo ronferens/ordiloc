@@ -57,10 +57,13 @@ class CameraPoseOrdinalLoss(nn.Module):
             :param gt_labels: (torch.Tensor) batch of ground_truth poses classes, a Nx2 tensor
             :return: camera pose loss
             """
-            gt_pose_class = utils.convert_pose_labels_to_classes(est_pose_class.shape[1], gt_labels)
+            num_clusters = [est_pose_class[0].shape[1], est_pose_class[1].shape[1]]
+            gt_pose_class = utils.convert_pose_labels_to_classes(num_clusters, gt_labels)
 
-            ordi_loss = self.inter_loss_weight * nn.MSELoss(reduction='none')(est_pose_class[:, :, 0], gt_pose_class[:, :, 0]).sum(axis=1) + \
-                        (1 - self.inter_loss_weight) * nn.MSELoss(reduction='none')(est_pose_class[:, :, 1], gt_pose_class[:, :, 1]).sum(axis=1)
+            ordi_loss = self.inter_loss_weight * nn.MSELoss(reduction='none')(est_pose_class[0],
+                                                                              gt_pose_class[0]).sum(axis=1) + \
+                        (1 - self.inter_loss_weight) * nn.MSELoss(reduction='none')(est_pose_class[1],
+                                                                                    gt_pose_class[1]).sum(axis=1)
             ordi_loss = torch.sum(ordi_loss)
 
             return ordi_loss

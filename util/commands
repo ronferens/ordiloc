@@ -5,7 +5,7 @@ ordiposenet
 train
 models/backbones/efficient-net-b0.pth
 /media/ronf/data/datasets/cambridge
-datasets/CambridgeLandmarks/abs_cambridge_pose_sorted.csv_KingsCollege_train_4_classes.csv
+datasets/CambridgeLandmarks/abs_cambridge_pose_sorted.csv_KingsCollege_train_4_12_classes.csv
 
 # ===================================
 # Test
@@ -14,11 +14,11 @@ ordiposenet
 test
 models/backbones/efficient-net-b0.pth
 /media/ronf/data/datasets/cambridge
-datasets/CambridgeLandmarks/abs_cambridge_pose_sorted.csv_KingsCollege_test_4_classes.csv
+datasets/CambridgeLandmarks/abs_cambridge_pose_sorted.csv_KingsCollege_test_4_12_classes.csv
 --train_labels_file
-datasets/CambridgeLandmarks/abs_cambridge_pose_sorted.csv_KingsCollege_train_4_classes.csv
+datasets/CambridgeLandmarks/abs_cambridge_pose_sorted.csv_KingsCollege_train_4_12_classes.csv
 --checkpoint_path
-./out/run_13_10_21_16_40_final.pth
+./out/run_15_10_21_23_30_final.pth
 
 
 Cambridge

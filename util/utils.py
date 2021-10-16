@@ -58,11 +58,12 @@ def init_logger():
 # Evaluation utils
 ##########################
 def convert_pose_labels_to_classes(num_segments, labels):
-    pose_class = torch.zeros((labels.shape[0], num_segments, 2)).to(labels.device)
+    pose_class = [torch.zeros((labels[0].shape[0], num_segments[0])).to(labels[0].device),
+                  torch.zeros((labels[1].shape[0], num_segments[1])).to(labels[1].device)]
 
-    for i, target in enumerate(labels):
-        pose_class[i, 0:(target[0].int() + 1), 0] = 1
-        pose_class[i, 0:(target[1].int() + 1), 1] = 1
+    for j in range(2):
+        for i, target in enumerate(labels[j]):
+            pose_class[j][i, 0:(target.int() + 1)] = 1
 
     return pose_class
 
@@ -101,11 +102,11 @@ def pose_class_err(preds, gt_labels):
     :param gt_pose: (torch.Tensor) a batch of ground-truth poses (Nx7, N is the batch size)
     :return: position error(s) and orientation errors(s)
     """
-    est_position_class = convert_pred_to_label(preds[:, :, 0])
-    est_orientation_class = convert_pred_to_label(preds[:, :, 1])
+    est_position_class = convert_pred_to_label(preds[0])
+    est_orientation_class = convert_pred_to_label(preds[1])
 
-    pose_class_err = est_position_class == gt_labels[:, 0]
-    orient_class_err = est_orientation_class == gt_labels[:, 1]
+    pose_class_err = est_position_class == gt_labels[0]
+    orient_class_err = est_orientation_class == gt_labels[1]
     return pose_class_err, orient_class_err
 
 
