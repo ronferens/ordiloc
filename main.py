@@ -148,6 +148,7 @@ if __name__ == "__main__":
 
                 gt_pose = minibatch.get('pose').to(dtype=torch.float32)
                 gt_pose_cls = minibatch.get('pose_cls').to(dtype=torch.float32)
+                gt_orient_cls = minibatch.get('orient_cls').to(dtype=torch.float32)
                 batch_size = gt_pose.shape[0]
                 n_samples += batch_size
                 n_total_samples += batch_size
@@ -159,10 +160,12 @@ if __name__ == "__main__":
                 res = model(minibatch)
                 est_pose = res.get('pose')
                 est_pose_cls = res.get('pose_cls')
+                est_orient_cls = res.get('orient_cls')
 
                 # Calculating the losses
                 pose_loss_val = pose_loss(est_pose, gt_pose)
-                pose_ordi_loss_val = ordi_loss_weight * pose_ordi_loss(est_pose_cls, gt_pose_cls)
+                pose_ordi_loss_val = ordi_loss_weight * pose_ordi_loss([est_pose_cls, est_orient_cls],
+                                                                       [gt_pose_cls, gt_orient_cls])
                 criterion = pose_loss_val + pose_ordi_loss_val
                 # criterion = pose_loss(est_pose, gt_pose) + ordi_loss_weight * pose_ordi_loss(est_pose_cls, gt_pose_cls)
 
@@ -186,7 +189,10 @@ if __name__ == "__main__":
                                                                         posit_err.mean().item(),
                                                                         orient_err.mean().item()))
 
-                    pose_class_err, orient_class_err = utils.pose_class_err(est_pose_cls.detach(), gt_pose_cls.detach())
+                    pose_class_err, orient_class_err = utils.pose_class_err([est_pose_cls.detach(),
+                                                                             est_orient_cls.detach()],
+                                                                            [gt_pose_cls.detach(),
+                                                                             gt_orient_cls.detach()])
                     logging.info("[Batch-{}/Epoch-{}] running camera pose loss: {:.3f}, "
                                  "Pose class error: Position={:.2f}%, Orientation={:.2f}%".format(
                         batch_idx + 1, epoch + 1, (running_loss / n_samples),
@@ -233,8 +239,8 @@ if __name__ == "__main__":
 
         stats = np.zeros((len(dataloader.dataset), 5))
 
-        gt_cls = []
-        preds_cls = []
+        gt = {'Position': [], 'Orientation': []}
+        preds = {'Position': [], 'Orientation': []}
 
         with torch.no_grad():
             for i, minibatch in enumerate(dataloader, 0):
@@ -243,6 +249,7 @@ if __name__ == "__main__":
 
                 gt_pose = minibatch.get('pose').to(dtype=torch.float32)
                 gt_pose_cls = minibatch.get('pose_cls').to(dtype=torch.float32)
+                gt_orient_cls = minibatch.get('orient_cls').to(dtype=torch.float32)
 
                 # Forward pass to predict the pose
                 tic = time.time()
@@ -251,24 +258,30 @@ if __name__ == "__main__":
 
                 est_pose = res.get('pose')
                 est_pose_cls = res.get('pose_cls')
+                est_orient_cls = res.get('orient_cls')
 
-                # Evaluate error
+                # Evaluate pose error
                 posit_err, orient_err = utils.pose_err(est_pose, gt_pose)
 
                 # Collect statistics
                 stats[i, 0] = posit_err.item()
                 stats[i, 1] = orient_err.item()
-                stats[i, 2] = (toc - tic)*1000
+                stats[i, 2] = (toc - tic) * 1000
 
                 logging.info("Pose error: {:.3f}[m], {:.3f}[deg], inferred in {:.2f}[ms]".format(
                     stats[i, 0],  stats[i, 1],  stats[i, 2]))
 
                 # Saving the predictions for the final confusion matrix
-                preds_cls.append(utils.convert_pred_to_label(est_pose_cls.detach()).data.cpu().numpy())
+                preds['Position'].append(utils.convert_pred_to_label(est_pose_cls.detach()).data.cpu().numpy())
+                preds['Orientation'].append(utils.convert_pred_to_label(est_orient_cls.detach()).data.cpu().numpy())
+                gt['Position'].append(gt_pose_cls.data.cpu().numpy())
+                gt['Orientation'].append(gt_orient_cls.data.cpu().numpy())
 
-                # Pose class error on validation set
-                gt_cls.append(gt_pose_cls.data.cpu().numpy())
-                pose_class_err, orient_class_err = utils.pose_class_err(est_pose_cls.detach(), gt_pose_cls.detach())
+                # Evaluate pose's ordinal classification error
+                pose_class_err, orient_class_err = utils.pose_class_err([est_pose_cls.detach(),
+                                                                         est_orient_cls.detach()],
+                                                                        [gt_pose_cls.detach(),
+                                                                         gt_orient_cls.detach()])
                 logging.info("Pose class error: Position={}, Orientation={}".format(pose_class_err.item(),
                                                                                     orient_class_err.item()))
                 # Collect statistics
@@ -278,14 +291,14 @@ if __name__ == "__main__":
         # Record overall statistics
         logging.info("Performance of {} on {}".format(args.checkpoint_path, args.labels_file))
         logging.info("\tMedian pose error: {:.3f}[m], {:.3f}[deg]".format(np.nanmedian(stats[:, 0]),
-                                                                        np.nanmedian(stats[:, 1])))
+                                                                          np.nanmedian(stats[:, 1])))
         logging.info("\tPose class error: Position={:.2f}%, Orientation={:.2f}%".format(
             100. * np.sum(stats[:, 3])/stats.shape[0],
             100. * np.sum(stats[:, 4]/stats.shape[0])))
         logging.info("\tMean inference time:{:.2f}[ms]".format(np.mean(stats[:, 2])))
 
-        for indx, cluster_type in enumerate(['Position', 'Orientation']):
-            conf_matrix = confusion_matrix(y_true=np.array(preds_cls)[:, 0, indx], y_pred=np.array(gt_cls)[:, 0, indx])
-            target_names = ['Segment #{}'.format(i) for i in range(4)]
+        for cluster_type in ['Position', 'Orientation']:
+            conf_matrix = confusion_matrix(y_true=np.array(preds[cluster_type]), y_pred=np.array(gt[cluster_type]))
+            target_names = ['Segment #{}'.format(i) for i in range(np.max(gt[cluster_type]).astype(np.int32))]
             plotutils.plot_confusion_matrix(conf_matrix, target_names, title='Confusion matrix - ' + cluster_type,
                                             cmap=None, normalize=True)

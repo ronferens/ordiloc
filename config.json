@@ -3,7 +3,8 @@
 		"n_freq_print": 5,
 		"n_freq_checkpoint": 50,
 		"n_workers": 4,
-		"device_id": "cuda:0"
+		"device_id": "cuda:0",
+		"use_visdom": true
 	},
 	"posenet": {
 		"batch_size": 32,
@@ -36,7 +37,7 @@
 		"latent_dim": 1024,
 		"ordi_loss_weight": 1.0,
 		"num_classes_pos": 4,
-		"num_classes_orient": 4,
+		"num_classes_orient": 12,
 		"inter_loss_weight": 0.5
 	},
 	"transposenet": {
