@@ -14,7 +14,6 @@ from models.pose_regressors import get_model
 from os.path import join
 from sklearn.metrics import confusion_matrix
 from util import plotutils
-from util import visdomutils
 
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
@@ -64,6 +63,7 @@ if __name__ == "__main__":
     # Init Visdom context
     visdom_active = config.get('device_id')
     if visdom_active:
+        from util import visdomutils
         plotter = visdomutils.VisdomLinePlotter(env_name=utils.get_stamp_from_log())
 
     # Create the model
