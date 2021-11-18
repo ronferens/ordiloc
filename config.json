@@ -3,7 +3,8 @@
 		"n_freq_print": 5,
 		"n_freq_checkpoint": 50,
 		"n_workers": 4,
-		"device_id": "cuda:0"
+		"device_id": "cuda:0",
+		"mlflow_uri": "http://localhost:5000"
 	},
 	"posenet": {
 		"batch_size": 32,
