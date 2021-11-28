@@ -28,6 +28,7 @@ if __name__ == "__main__":
                             help="path to a pre-trained model (should match the model indicated in model_name")
     arg_parser.add_argument("--experiment", help="a short string to describe the experiment/commit used")
     arg_parser.add_argument("--train_labels_file", help="used for loading the clusters' centroids")
+    arg_parser.add_argument("--mlflow_exp_group_name", help="used for loading the clusters' centroids")
 
     args = arg_parser.parse_args()
     utils.init_logger()
@@ -50,8 +51,19 @@ if __name__ == "__main__":
 
     # Setting-up MLFlow
     mlflow.set_tracking_uri(config.get('mlflow_uri'))
-    mlflow_experiment_id = utils.get_stamp_from_log()
-    experiment_id = mlflow.create_experiment(mlflow_experiment_id)
+    if args.mlflow_exp_group_name is not None:
+        mlflow_experiment_name = args.mlflow_exp_group_name
+    else:
+        mlflow_experiment_name = utils.get_stamp_from_log()
+
+    for mlflow_experiment in mlflow.list_experiments():
+        if mlflow_experiment_name == mlflow_experiment.name:
+            mlflow_exp_exist = True
+            experiment_id = mlflow_experiment.experiment_id
+            break
+
+    if not mlflow_exp_exist:
+        experiment_id = mlflow.create_experiment(mlflow_experiment_name)
 
     # Set the seeds and the device
     use_cuda = torch.cuda.is_available()
@@ -85,8 +97,9 @@ if __name__ == "__main__":
             # Set to train mode
             model.train()
 
-            cent_pos, cent_orient = utils.load_clusters_centroids(args.labels_file, device)
-            model.set_centroids(cent_pos, cent_orient)
+            if config.get('use_residuals'):
+                cent_pos, cent_orient = utils.load_clusters_centroids(args.labels_file, device)
+                model.set_centroids(cent_pos, cent_orient)
 
             # Freeze parts of the model if indicated
             freeze = config.get("freeze")
@@ -126,7 +139,7 @@ if __name__ == "__main__":
             else:
                 transform = utils.train_transforms.get('baseline')
 
-            dataset = CameraPoseDataset(args.dataset_path, args.labels_file, transform)
+            dataset = CameraPoseDataset(args.dataset_path, args.labels_file, use_ordi_loss, transform)
             loader_params = {'batch_size': config.get('batch_size'),
                              'shuffle': True,
                              'num_workers': config.get('n_workers')}
@@ -163,7 +176,8 @@ if __name__ == "__main__":
                         minibatch[k] = v.to(device)
 
                     gt_pose = minibatch.get('pose').to(dtype=torch.float32)
-                    gt_pose_cls = minibatch.get('pose_cls').to(dtype=torch.float32)
+                    if use_ordi_loss:
+                        gt_pose_cls = minibatch.get('pose_cls').to(dtype=torch.float32)
                     batch_size = gt_pose.shape[0]
                     n_samples += batch_size
                     n_total_samples += batch_size
@@ -245,8 +259,7 @@ if __name__ == "__main__":
         # Set to eval mode
         model.eval()
 
-        use_ordi_loss = config.get("use_ordi_loss")
-        if use_ordi_loss:
+        if config.get('use_residuals'):
             if args.train_labels_file is None:
                 raise 'In test mode you must supply the \'train_dataset_path\' argument'
             else:

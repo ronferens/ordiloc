@@ -10,16 +10,19 @@ class CameraPoseDataset(Dataset):
         A class representing a dataset of images and their poses
     """
 
-    def __init__(self, dataset_path, labels_file, data_transform=None):
+    def __init__(self, dataset_path, labels_file, use_class=False, data_transform=None):
         """
         :param dataset_path: (str) the path to the dataset
         :param labels_file: (str) a file with images and their path labels
+        :param use_class: (bool) indicate whether to load pose classification labels
         :param data_transform: (Transform object) a torchvision transform object
         :return: an instance of the class
         """
         super(CameraPoseDataset, self).__init__()
         self.img_paths, self.poses = read_labels_file(labels_file, dataset_path)
-        _, self.pose_classes = read_labels_classes_file(labels_file, dataset_path)
+        self.use_class = use_class
+        if self.use_class:
+            _, self.pose_classes = read_labels_classes_file(labels_file, dataset_path)
         self.dataset_size = self.poses.shape[0]
         self.transform = data_transform
 
@@ -29,11 +32,15 @@ class CameraPoseDataset(Dataset):
     def __getitem__(self, idx):
         img = imread(self.img_paths[idx])
         pose = self.poses[idx]
-        pose_cls = self.pose_classes[idx]
+        if self.use_class:
+            pose_cls = self.pose_classes[idx]
         if self.transform:
             img = self.transform(img)
 
-        sample = {'img': img, 'pose': pose, 'pose_cls': pose_cls}
+        if self.use_class:
+            sample = {'img': img, 'pose': pose, 'pose_cls': pose_cls}
+        else:
+            sample = {'img': img, 'pose': pose}
         return sample
 
 
