@@ -9,6 +9,7 @@
 	"posenet": {
 		"batch_size": 32,
 		"learnable": true,
+		"use_ordi_loss": false,
 		"s_x": -3.0,
 		"s_q": -6.5,
 		"norm": 2,
@@ -24,6 +25,7 @@
 	"ordiposenet": {
 		"batch_size": 8,
 		"learnable": true,
+		"use_ordi_loss": false,
 		"s_x": -3.0,
 		"s_q": -6.5,
 		"norm": 2,
