@@ -49,8 +49,9 @@ if __name__ == "__main__":
         '\n'.join(["\t{}: {}".format(k, v) for k, v in config.items()])))
 
     # Setting-up MLFlow
-    mlflow.set_tracking_uri("http://localhost:5000")#config.get('mlflow_uri'))
-    mlflow_experiment_id = 1#utils.get_stamp_from_log()
+    mlflow.set_tracking_uri(config.get('mlflow_uri'))
+    mlflow_experiment_id = utils.get_stamp_from_log()
+    experiment_id = mlflow.create_experiment(mlflow_experiment_id)
 
     # Set the seeds and the device
     use_cuda = torch.cuda.is_available()
@@ -80,7 +81,7 @@ if __name__ == "__main__":
         logging.info("Initializing from checkpoint: {}".format(args.checkpoint_path))
 
     if args.mode == 'train':
-        with mlflow.start_run():#experiment_id=mlflow_experiment_id):
+        with mlflow.start_run(experiment_id=experiment_id):
             # Set to train mode
             model.train()
 
