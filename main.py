@@ -245,11 +245,13 @@ if __name__ == "__main__":
         # Set to eval mode
         model.eval()
 
-        if args.train_labels_file is None:
-            raise 'In test mode you must supply the \'train_dataset_path\' argument'
-        else:
-            cent_pos, cent_orient = utils.load_clusters_centroids(args.train_labels_file, device)
-            model.set_centroids(cent_pos, cent_orient)
+        use_ordi_loss = config.get("use_ordi_loss")
+        if use_ordi_loss:
+            if args.train_labels_file is None:
+                raise 'In test mode you must supply the \'train_dataset_path\' argument'
+            else:
+                cent_pos, cent_orient = utils.load_clusters_centroids(args.train_labels_file, device)
+                model.set_centroids(cent_pos, cent_orient)
 
         # Set the dataset and data loader
         transform = utils.test_transforms.get('baseline')
@@ -295,25 +297,28 @@ if __name__ == "__main__":
                 preds_cls.append(utils.convert_pred_to_label(est_pose_cls.detach()).data.cpu().numpy())
 
                 # Pose class error on validation set
-                gt_cls.append(gt_pose_cls.data.cpu().numpy())
-                pose_class_err, orient_class_err = utils.pose_class_err(est_pose_cls.detach(), gt_pose_cls.detach())
-                logging.info("Pose class error: Position={}, Orientation={}".format(pose_class_err.item(),
-                                                                                    orient_class_err.item()))
-                # Collect statistics
-                stats[i, 3] = pose_class_err.item()
-                stats[i, 4] = orient_class_err.item()
+                if use_ordi_loss:
+                    gt_cls.append(gt_pose_cls.data.cpu().numpy())
+                    pose_class_err, orient_class_err = utils.pose_class_err(est_pose_cls.detach(), gt_pose_cls.detach())
+                    logging.info("Pose class error: Position={}, Orientation={}".format(pose_class_err.item(),
+                                                                                        orient_class_err.item()))
+                    # Collect statistics
+                    stats[i, 3] = pose_class_err.item()
+                    stats[i, 4] = orient_class_err.item()
 
         # Record overall statistics
         logging.info("Performance of {} on {}".format(args.checkpoint_path, args.labels_file))
         logging.info("\tMedian pose error: {:.3f}[m], {:.3f}[deg]".format(np.nanmedian(stats[:, 0]),
                                                                         np.nanmedian(stats[:, 1])))
-        logging.info("\tPose class error: Position={:.2f}%, Orientation={:.2f}%".format(
-            100. * np.sum(stats[:, 3])/stats.shape[0],
-            100. * np.sum(stats[:, 4]/stats.shape[0])))
         logging.info("\tMean inference time:{:.2f}[ms]".format(np.mean(stats[:, 2])))
 
-        for indx, cluster_type in enumerate(['Position', 'Orientation']):
-            conf_matrix = confusion_matrix(y_true=np.array(preds_cls)[:, 0, indx], y_pred=np.array(gt_cls)[:, 0, indx])
-            target_names = ['Segment #{}'.format(i) for i in range(4)]
-            plotutils.plot_confusion_matrix(conf_matrix, target_names, title='Confusion matrix - ' + cluster_type,
-                                            cmap=None, normalize=True)
+        if use_ordi_loss:
+            logging.info("\tPose class error: Position={:.2f}%, Orientation={:.2f}%".format(
+                100. * np.sum(stats[:, 3]) / stats.shape[0],
+                100. * np.sum(stats[:, 4] / stats.shape[0])))
+
+            for indx, cluster_type in enumerate(['Position', 'Orientation']):
+                conf_matrix = confusion_matrix(y_true=np.array(preds_cls)[:, 0, indx], y_pred=np.array(gt_cls)[:, 0, indx])
+                target_names = ['Segment #{}'.format(i) for i in range(4)]
+                plotutils.plot_confusion_matrix(conf_matrix, target_names, title='Confusion matrix - ' + cluster_type,
+                                                cmap=None, normalize=True)
