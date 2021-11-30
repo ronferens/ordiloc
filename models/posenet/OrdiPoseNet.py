@@ -22,6 +22,7 @@ class OrdiPoseNet(nn.Module):
         latent_dim = config.get('latent_dim')
         num_classes_pos = config.get('num_classes_pos')
         num_classes_orient = config.get('num_classes_orient')
+        self._use_residual = config.get('use_residual')
 
         # Regressor layers
         self.fc1 = nn.Linear(backbone_dim, latent_dim)
@@ -73,16 +74,19 @@ class OrdiPoseNet(nn.Module):
         x = self.dropout(F.relu(self.fc1(x)))
 
         # Performing the ordinal classification
-        cls_x = F.sigmoid(self.cls_pos(x))
-        cls_q = F.sigmoid(self.cls_orient(x))
+        cls_x = torch.sigmoid(self.cls_pos(x))
+        cls_q = torch.sigmoid(self.cls_orient(x))
 
         # Regressing the camera pose
         cls_x_latent = F.relu(self.cls_pos_fc(cls_x))
         cls_q_latent = F.relu(self.cls_orient_fc(cls_q))
 
-        p_x = self.reg_pos(torch.add(x, cls_x_latent)) + self._cent_pos[self.convert_pred_to_label(cls_x)]
-        p_q = self.reg_orient(torch.add(x, torch.add(cls_x_latent, cls_q_latent))) + \
-              self._cent_orient[self.convert_pred_to_label(cls_q)]
+        p_x = self.reg_pos(torch.add(x, cls_x_latent))
+        if self._use_residual:
+            p_x += self._cent_pos[self.convert_pred_to_label(cls_x)]
+        p_q = self.reg_orient(torch.add(x, torch.add(cls_x_latent, cls_q_latent)))
+        if self._use_residual:
+            p_q += self._cent_orient[self.convert_pred_to_label(cls_q)]
 
         return {'pose': torch.cat((p_x, p_q), dim=1), 'pose_cls': torch.stack((cls_x, cls_q), dim=2)}
 
