@@ -118,8 +118,8 @@ if __name__ == "__main__":
 
             # Set the losses
             pose_loss = CameraPoseLoss(config).to(device)
-            use_ordi_loss = config.get("use_ordi_loss")
-            if use_ordi_loss:
+            use_ordi_cls = config.get("use_ordi_cls")
+            if use_ordi_cls:
                 pose_ordi_loss = CameraPoseOrdinalLoss(config).to(device)
 
             # Set the optimizer and scheduler
@@ -139,7 +139,7 @@ if __name__ == "__main__":
             else:
                 transform = utils.train_transforms.get('baseline')
 
-            dataset = CameraPoseDataset(args.dataset_path, args.labels_file, use_ordi_loss, transform)
+            dataset = CameraPoseDataset(args.dataset_path, args.labels_file, use_ordi_cls, transform)
             loader_params = {'batch_size': config.get('batch_size'),
                              'shuffle': True,
                              'num_workers': config.get('n_workers')}
@@ -165,10 +165,10 @@ if __name__ == "__main__":
             for epoch in range(n_epochs):
 
                 # Resetting temporal loss used for logging
-                running_loss = 0.0
-                running_loss_pose = 0.0
-                if use_ordi_loss:
-                    running_loss_pose_ordi = 0.0
+                epoch_running_loss = 0.0
+                epoch_running_pose_loss = 0.0
+                if use_ordi_cls:
+                    epoch_running_ordi_cls_loss = 0.0
                 n_samples = 0
 
                 for batch_idx, minibatch in enumerate(dataloader):
@@ -176,7 +176,7 @@ if __name__ == "__main__":
                         minibatch[k] = v.to(device)
 
                     gt_pose = minibatch.get('pose').to(dtype=torch.float32)
-                    if use_ordi_loss:
+                    if use_ordi_cls:
                         gt_pose_cls = minibatch.get('pose_cls').to(dtype=torch.float32)
                     batch_size = gt_pose.shape[0]
                     n_samples += batch_size
@@ -193,15 +193,15 @@ if __name__ == "__main__":
                     # Calculating the losses
                     pose_loss_val = pose_loss(est_pose, gt_pose)
                     criterion = pose_loss_val
-                    if use_ordi_loss:
+                    if use_ordi_cls:
                         pose_ordi_loss_val = ordi_loss_weight * pose_ordi_loss(est_pose_cls, gt_pose_cls)
                         criterion += pose_ordi_loss_val
 
                     # Collect for recoding and plotting
-                    running_loss += criterion.item()
-                    running_loss_pose += pose_loss_val.item()
-                    if use_ordi_loss:
-                        running_loss_pose_ordi += pose_ordi_loss_val.item()
+                    epoch_running_loss += criterion.item()
+                    epoch_running_pose_loss += pose_loss_val.item()
+                    if use_ordi_cls:
+                        epoch_running_ordi_cls_loss += pose_ordi_loss_val.item()
                     loss_vals.append(criterion.item())
                     sample_count.append(n_total_samples)
 
@@ -213,24 +213,24 @@ if __name__ == "__main__":
                     if batch_idx % n_freq_print == 0:
                         posit_err, orient_err = utils.pose_err(est_pose, gt_pose)
                         logging.info("[Batch-{}/Epoch-{}] running camera pose loss: {:.3f}, "
-                                     "camera pose error: {:.2f}[m], {:.2f}[deg]".format( batch_idx + 1, epoch + 1,
-                                                                                         (running_loss/n_samples),
-                                                                                         posit_err.mean().item(),
-                                                                                         orient_err.mean().item()))
+                                     "camera pose error: {:.2f}[m], {:.2f}[deg]".format(batch_idx + 1, epoch + 1,
+                                                                                        (epoch_running_loss / n_samples),
+                                                                                        posit_err.mean().item(),
+                                                                                        orient_err.mean().item()))
 
-                        if use_ordi_loss:
+                        if use_ordi_cls:
                             pose_class_err, orient_class_err = utils.pose_class_err(est_pose_cls.detach(),
                                                                                     gt_pose_cls.detach())
                             logging.info("[Batch-{}/Epoch-{}] running camera pose loss: {:.3f}, "
                                          "Pose class error: Position={:.2f}%, Orientation={:.2f}%".format(
-                                batch_idx + 1, epoch + 1, (running_loss / n_samples),
+                                batch_idx + 1, epoch + 1, (epoch_running_loss / n_samples),
                                 100. * torch.sum(pose_class_err).item() / pose_class_err.shape[0],
                                 100. * torch.sum(orient_class_err).item() / pose_class_err.shape[0]))
 
                 if visdom_active:
                     plotter.plot('pose_loss', 'train', 'Pose Loss', epoch, pose_loss_val.item())
-                    plotter.plot('running_loss', 'train', 'Running Loss', epoch, running_loss)
-                    if use_ordi_loss:
+                    plotter.plot('running_loss', 'train', 'Epoch Running Loss', epoch, epoch_running_loss)
+                    if use_ordi_cls:
                         plotter.plot('pose_ordi_loss', 'train', 'Ordinal Classification Loss', epoch,
                                      pose_ordi_loss_val.item())
 
@@ -244,7 +244,7 @@ if __name__ == "__main__":
                 # Writing to MLFlow
                 mlflow.log_metric('Loss', criterion.item())
                 mlflow.log_metric('pose_loss_val', pose_loss_val.item())
-                if use_ordi_loss:
+                if use_ordi_cls:
                     mlflow.log_metric('pose_ordi_loss_val', pose_ordi_loss_val.item())
 
             logging.info('Training completed')
@@ -306,11 +306,11 @@ if __name__ == "__main__":
                 logging.info("Pose error: {:.3f}[m], {:.3f}[deg], inferred in {:.2f}[ms]".format(
                     stats[i, 0],  stats[i, 1],  stats[i, 2]))
 
-                # Saving the predictions for the final confusion matrix
-                preds_cls.append(utils.convert_pred_to_label(est_pose_cls.detach()).data.cpu().numpy())
-
                 # Pose class error on validation set
-                if use_ordi_loss:
+                if use_ordi_cls:
+                    # Saving the predictions for the final confusion matrix
+                    preds_cls.append(utils.convert_pred_to_label(est_pose_cls.detach()).data.cpu().numpy())
+
                     gt_cls.append(gt_pose_cls.data.cpu().numpy())
                     pose_class_err, orient_class_err = utils.pose_class_err(est_pose_cls.detach(), gt_pose_cls.detach())
                     logging.info("Pose class error: Position={}, Orientation={}".format(pose_class_err.item(),
@@ -325,7 +325,7 @@ if __name__ == "__main__":
                                                                         np.nanmedian(stats[:, 1])))
         logging.info("\tMean inference time:{:.2f}[ms]".format(np.mean(stats[:, 2])))
 
-        if use_ordi_loss:
+        if use_ordi_cls:
             logging.info("\tPose class error: Position={:.2f}%, Orientation={:.2f}%".format(
                 100. * np.sum(stats[:, 3]) / stats.shape[0],
                 100. * np.sum(stats[:, 4] / stats.shape[0])))
