@@ -26,7 +26,7 @@
 	"ordiposenet": {
 		"batch_size": 32,
 		"learnable": true,
-		"use_ordi_cls": false,
+		"use_ordi_cls": true,
 		"use_residual": false,
 		"s_x": -3.0,
 		"s_q": -6.5,

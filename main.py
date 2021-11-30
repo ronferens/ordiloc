@@ -56,6 +56,7 @@ if __name__ == "__main__":
     else:
         mlflow_experiment_name = utils.get_stamp_from_log()
 
+    mlflow_exp_exist = False
     for mlflow_experiment in mlflow.list_experiments():
         if mlflow_experiment_name == mlflow_experiment.name:
             mlflow_exp_exist = True
@@ -228,10 +229,10 @@ if __name__ == "__main__":
                                 100. * torch.sum(orient_class_err).item() / pose_class_err.shape[0]))
 
                 if visdom_active:
-                    plotter.plot('pose_loss', 'train', 'Pose Loss', epoch, pose_loss_val.item())
-                    plotter.plot('running_loss', 'train', 'Epoch Running Loss', epoch, epoch_running_loss)
+                    plotter.plot('Pose Loss', 'train', 'Pose Loss', epoch, pose_loss_val.item())
+                    plotter.plot('Epoch Running Loss', 'train', 'Epoch Running Loss', epoch, epoch_running_loss)
                     if use_ordi_cls:
-                        plotter.plot('pose_ordi_loss', 'train', 'Ordinal Classification Loss', epoch,
+                        plotter.plot('Ordinal Classification Loss', 'train', 'Ordinal Classification Loss', epoch,
                                      pose_ordi_loss_val.item())
 
                 # Save checkpoint
