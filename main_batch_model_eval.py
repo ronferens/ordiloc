@@ -15,6 +15,7 @@ from os import listdir
 from os.path import join, splitext
 from sklearn.metrics import confusion_matrix
 from util import plotutils
+import plotly
 import plotly.graph_objects as go
 
 
@@ -36,6 +37,7 @@ if __name__ == "__main__":
     arg_parser.add_argument("models_prefix", help="used for loading the clusters' centroids")
     arg_parser.add_argument("train_labels_file", help="used for loading the clusters' centroids")
     arg_parser.add_argument("--models_to_evaluate", help="used for loading the clusters' centroids", type=str)
+    arg_parser.add_argument("--results_file_suffix", help="a suffix for the saved .csv results file")
     arg_parser.add_argument("--verbose", help="print per-image results, for each experiment", default=False,
                             action='store_false')
 
@@ -161,19 +163,22 @@ if __name__ == "__main__":
 
                     gt_cls.append(gt_pose_cls.data.cpu().numpy())
                     pose_class_err, orient_class_err = utils.pose_class_err(est_pose_cls.detach(), gt_pose_cls.detach())
-                    logging.info("Pose class error: Position={}, Orientation={}".format(pose_class_err.item(),
-                                                                                        orient_class_err.item()))
+
+                    if args.verbose:
+                        logging.info("Pose class error: Position={}, Orientation={}".format(pose_class_err.item(),
+                                                                                            orient_class_err.item()))
                     # Collect statistics
                     stats[i, 3] = pose_class_err.item()
                     stats[i, 4] = orient_class_err.item()
 
         # Record overall statistics
-        logging.info("Performance of {} on {}".format(checkpoint_path, args.labels_file))
-        logging.info("\tMedian pose error: {:.3f}[m], {:.3f}[deg]".format(np.nanmedian(stats[:, 0]),
-                                                                          np.nanmedian(stats[:, 1])))
-        logging.info("\tMean inference time:{:.2f}[ms]".format(np.mean(stats[:, 2])))
+        if args.verbose:
+            logging.info("Performance of {} on {}".format(checkpoint_path, args.labels_file))
+            logging.info("\tMedian pose error: {:.3f}[m], {:.3f}[deg]".format(np.nanmedian(stats[:, 0]),
+                                                                              np.nanmedian(stats[:, 1])))
+            logging.info("\tMean inference time:{:.2f}[ms]".format(np.mean(stats[:, 2])))
 
-        if use_ordi_cls:
+        if args.verbose and use_ordi_cls:
             logging.info("\tPose class error: Position={:.2f}%, Orientation={:.2f}%".format(
                 100. * np.sum(stats[:, 3]) / stats.shape[0],
                 100. * np.sum(stats[:, 4] / stats.shape[0])))
@@ -200,7 +205,12 @@ if __name__ == "__main__":
                                                                    col_model,
                                                                    col_pos_err,
                                                                    col_orient_err])
-    batch_eval_results.to_csv('{}_batch_eval_{}.csv'.format(args.models_prefix, utils.get_stamp_from_log()))
+
+    if args.results_file_suffix is not None:
+        results_file_prefix = '{}_batch_eval_{}'.format(args.models_prefix, args.results_file_suffix)
+    else:
+        results_file_prefix = '{}_batch_eval_{}'.format(args.models_prefix, utils.get_stamp_from_log())
+    batch_eval_results.to_csv(f'{results_file_prefix}.csv')
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=batch_eval_results[col_chk_pnt],
@@ -219,4 +229,5 @@ if __name__ == "__main__":
         font=dict(family="Courier New, monospace")
     )
 
-    fig.show()
+    # Plotting and saving the figure
+    plotly.offline.plot(fig, filename=f'{results_file_prefix}.html')
